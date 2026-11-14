@@ -69,6 +69,15 @@
         "eslint-plugin-prettier"
       ]
     },
+    "apps/client-next": {
+      "entry": [
+        "src/**/*.spec.ts",
+        "src/test-setup.ts"
+      ],
+      "ignore": [
+        "libs/ui/**"
+      ]
+    },
     "apps/cli": {
       "entry": [
         "test/**/*.test.ts"

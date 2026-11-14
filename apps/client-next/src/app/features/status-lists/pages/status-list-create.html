@@ -1,0 +1,86 @@
+<app-page-header
+  heading="Create status list"
+  description="EUDIPLO creates status lists by itself as it issues revocable credentials. Create one to reserve it for a credential type, sign it with a particular key chain or give it another size."
+/>
+
+<form #formElement class="grid max-w-4xl gap-6" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="binding-heading"
+  >
+    <h2 id="binding-heading" class="font-semibold">What it serves</h2>
+    <p class="text-muted-foreground mt-1 mb-5 text-sm">You can change both later.</p>
+    <app-status-list-binding-fields [form]="form.controls.binding" />
+  </section>
+
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="size-heading"
+  >
+    <h2 id="size-heading" class="font-semibold">Size</h2>
+    <p class="text-muted-foreground mt-1 mb-5 text-sm">
+      Fixed once the list exists. Leave a field empty to use the default.
+    </p>
+    <div class="grid gap-x-6 gap-y-6 md:grid-cols-2">
+      <div class="grid content-start gap-2">
+        <label class="text-sm font-medium" for="list-bits">Status size</label>
+        <hlm-native-select
+          class="w-full"
+          selectClass="h-10"
+          selectId="list-bits"
+          formControlName="bits"
+        >
+          <option value="">{{ defaultBits() }}</option>
+          @for (option of bitOptions; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+          }
+        </hlm-native-select>
+        <p class="text-muted-foreground text-sm">More bits hold more statuses per credential.</p>
+      </div>
+
+      <hlm-field class="content-start gap-2">
+        <label hlmFieldLabel for="list-capacity">Entries</label>
+        <input
+          hlmInput
+          id="list-capacity"
+          class="h-10"
+          type="number"
+          min="1000"
+          max="1000000"
+          step="1"
+          inputmode="numeric"
+          formControlName="capacity"
+          [placeholder]="defaultCapacity()"
+        />
+        <div class="flex flex-wrap gap-1.5" role="group" aria-label="Common sizes">
+          @for (preset of presets; track preset.value) {
+          <button
+            hlmBtn
+            variant="outline"
+            size="sm"
+            type="button"
+            class="h-7 px-2.5 text-xs"
+            [attr.aria-pressed]="form.controls.capacity.value === preset.value"
+            (click)="setCapacity(preset.value)"
+          >
+            {{ preset.label }}
+          </button>
+          }
+        </div>
+        <p hlmFieldDescription>How many credentials the list holds, {{ limits }}.</p>
+        <hlm-field-error validator="min">Enter at least 1,000.</hlm-field-error>
+        <hlm-field-error validator="max">Enter at most 1,000,000.</hlm-field-error>
+        <hlm-field-error validator="wholeNumber">Enter a whole number.</hlm-field-error>
+      </hlm-field>
+    </div>
+  </section>
+
+  <div class="flex flex-wrap justify-end gap-2">
+    <a hlmBtn variant="ghost" routerLink="/status-lists">Cancel</a>
+    <button hlmBtn type="submit" [attr.aria-disabled]="saving() || null">
+      @if (saving()) {
+      <hlm-spinner class="size-4" aria-hidden="true" />
+      Creating… } @else { Create status list }
+    </button>
+  </div>
+</form>

@@ -1,0 +1,323 @@
+<div class="relative isolate flex min-h-svh flex-col overflow-hidden">
+  <!-- Brand gradients: periwinkle and blue at the top, the amber of Diplo's fold at the bottom. -->
+  <div class="backdrop absolute inset-0 -z-10" aria-hidden="true"></div>
+
+  <header
+    class="mx-auto flex h-16 w-full max-w-330 shrink-0 min-[2200px]:max-w-380 items-center justify-between gap-4 px-5 sm:px-8 lg:px-12"
+  >
+    <div class="flex items-center gap-2.5">
+      <app-diplo-logo class="h-6 w-9.5" />
+      <span class="font-heading text-[1.05rem] font-bold tracking-tight">EUDIPLO</span>
+    </div>
+    <nav aria-label="Resources" class="flex items-center gap-1">
+      @if (isDevelopmentMode) {
+      <span
+        class="me-2 rounded-full bg-warning/12 px-2.5 py-1 text-xs font-semibold whitespace-nowrap text-warning"
+      >
+        <span class="sm:hidden">Dev build</span>
+        <span class="hidden sm:inline">Development build</span>
+      </span>
+      }
+      <a
+        hlmBtn
+        variant="ghost"
+        size="sm"
+        class="text-muted-foreground hidden sm:inline-flex"
+        href="https://docs.eudiplo.dev/"
+        target="_blank"
+        rel="noopener"
+        >Documentation</a
+      >
+      <a
+        hlmBtn
+        variant="ghost"
+        size="sm"
+        class="text-muted-foreground hidden sm:inline-flex"
+        href="https://github.com/EUDIPLO/eudiplo"
+        target="_blank"
+        rel="noopener"
+        >GitHub</a
+      >
+      <button
+        hlmBtn
+        variant="ghost"
+        size="icon"
+        type="button"
+        class="text-muted-foreground"
+        (click)="theme.toggle()"
+        [attr.aria-label]="theme.darkMode() ? 'Switch to light mode' : 'Switch to dark mode'"
+        [hlmTooltip]="theme.darkMode() ? 'Light mode' : 'Dark mode'"
+      >
+        <ng-icon [name]="theme.darkMode() ? 'lucideSun' : 'lucideMoon'" />
+      </button>
+    </nav>
+  </header>
+
+  <!-- One centred column on wide screens, so the picture and the form stay together. -->
+  <div
+    class="mx-auto grid w-full max-w-330 flex-1 items-center min-[2200px]:max-w-380 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] lg:pb-10"
+  >
+    <!-- What EUDIPLO does, shown on a wallet: issue a credential, verify a presentation. -->
+    <section class="hidden flex-col gap-6 py-6 ps-12 lg:flex" aria-labelledby="login-pitch">
+      <div class="max-w-lg">
+        <h2
+          id="login-pitch"
+          class="text-[2.6rem] leading-[1.05] font-bold 2xl:text-[3rem] min-[2200px]:text-[3.5rem]"
+        >
+          Issue credentials.<br />Verify presentations.
+        </h2>
+        <p
+          class="text-muted-foreground mt-4 max-w-md text-[1.02rem] leading-relaxed min-[2200px]:max-w-lg min-[2200px]:text-lg"
+        >
+          The console of your EUDIPLO instance: the credentials you issue to EUDI Wallets and the
+          presentations you ask them for.
+        </p>
+      </div>
+      <!-- The rings sit on the phone; the phone grows and shrinks with the screen's height. -->
+      <div class="relative flex justify-center pt-4">
+        <app-guilloche
+          class="absolute top-1/2 left-1/2 -z-10 size-190 -translate-x-1/2 -translate-y-1/2 min-[2200px]:size-240"
+          [radius]="0.4"
+          [color]="theme.darkMode() ? '#bec2ff' : '#343dff'"
+          [opacity]="theme.darkMode() ? 0.11 : 0.22"
+        />
+        <div class="phone-stage">
+          <app-wallet-phone />
+        </div>
+      </div>
+    </section>
+
+    <main
+      class="flex items-start justify-center px-5 pt-4 pb-16 sm:items-center sm:px-8 lg:py-6 lg:ps-0 lg:pe-12"
+    >
+      <div
+        class="w-full max-w-110 rounded-[1.75rem] min-[2200px]:max-w-122 min-[2200px]:p-12 bg-white/75 p-7 shadow-[0_30px_80px_-32px_rgba(27,33,96,0.4)] ring-1 ring-[#1b2160]/8 backdrop-blur-xl sm:p-10 dark:bg-[#0f1830]/75 dark:shadow-[0_30px_80px_-30px_rgba(0,0,0,0.7)] dark:ring-white/10"
+      >
+        <span
+          class="grid size-12 place-items-center rounded-2xl bg-[linear-gradient(135deg,#6b74ff,#343dff_55%,#232ad0)] shadow-[0_12px_24px_-10px_rgba(52,61,255,0.8),inset_0_1px_0_rgba(255,255,255,0.25)]"
+          aria-hidden="true"
+        >
+          <app-diplo-logo class="h-5 w-8 [--diplo-body:#ffffff] [--diplo-fold:#ffb787]" />
+        </span>
+        <h1 class="mt-6 text-[1.85rem] leading-tight font-bold">Sign in</h1>
+        <p class="text-muted-foreground mt-1.5">
+          @if (keptSession()) { Your previous session continues as soon as the backend answers. }
+          @else { Connect to your EUDIPLO instance. }
+        </p>
+
+        @if (keptSession(); as kept) {
+        <section class="mt-7 rounded-2xl bg-[#f4f5fc] p-5 dark:bg-white/5">
+          <div class="flex items-start gap-3">
+            <hlm-spinner class="text-primary mt-0.5 shrink-0" aria-hidden="true" />
+            <p class="min-w-0 text-sm leading-relaxed [overflow-wrap:anywhere]">
+              <output>
+                Resuming the session of <strong>{{ kept.clientId }}</strong> at {{ kept.baseUrl }}.
+                This page keeps trying until the session is renewed, then continues.
+              </output>
+            </p>
+          </div>
+          <div class="mt-5 flex flex-wrap gap-2">
+            <button
+              hlmBtn
+              type="button"
+              class="rounded-xl"
+              (click)="retryKeptSession()"
+              [disabled]="retryingKeptSession()"
+            >
+              Try again now
+            </button>
+            <button
+              hlmBtn
+              variant="ghost"
+              type="button"
+              class="rounded-xl"
+              (click)="discardKeptSession()"
+            >
+              Sign out and use other credentials
+            </button>
+          </div>
+        </section>
+        } @else if (loginForm) {
+        <form
+          #formElement
+          [formGroup]="loginForm"
+          (ngSubmit)="onSubmit()"
+          class="mt-8 grid gap-6"
+          novalidate
+        >
+          <hlm-field class="gap-2">
+            <label hlmFieldLabel for="login-instance">Instance URL</label>
+            <hlm-input-group class="bg-white dark:bg-white/5 h-12 rounded-xl">
+              <hlm-input-group-addon class="ps-1">
+                <ng-icon name="lucideGlobe" aria-hidden="true" />
+              </hlm-input-group-addon>
+              <input
+                #apiUrlInput
+                hlmInputGroupInput
+                id="login-instance"
+                formControlName="apiUrl"
+                type="url"
+                inputmode="url"
+                autocomplete="url"
+                spellcheck="false"
+                placeholder="https://eudiplo.example.com"
+                (blur)="onApiUrlBlur()"
+              />
+              <!-- The result of the instance check: short on screen, a sentence for screen readers. -->
+              <hlm-input-group-addon align="inline-end" class="pe-2">
+                <span role="status" class="flex items-center">
+                  @switch (instanceStatus()) { @case ('loading') {
+                  <span
+                    class="text-muted-foreground flex items-center gap-1.5 text-xs font-medium"
+                    aria-hidden="true"
+                  >
+                    <hlm-spinner class="size-3.5" />
+                    Checking
+                  </span>
+                  <span class="sr-only">Checking this instance.</span>
+                  } @case ('oidc') {
+                  <span
+                    class="text-success flex items-center gap-1.5 rounded-full bg-success/10 px-2 py-0.5 text-xs font-semibold"
+                    aria-hidden="true"
+                  >
+                    <span class="bg-success size-1.5 rounded-full"></span>
+                    SSO available
+                  </span>
+                  <span class="sr-only">This instance offers single sign-on.</span>
+                  } @case ('local') {
+                  <span class="sr-only">This instance signs in with a client ID and secret.</span>
+                  } }
+                </span>
+              </hlm-input-group-addon>
+            </hlm-input-group>
+            <hlm-field-error validator="required"
+              >Enter the address of the instance.</hlm-field-error
+            >
+            <hlm-field-error validator="pattern">
+              Enter an address that starts with http:// or https://.
+            </hlm-field-error>
+          </hlm-field>
+
+          <!-- The client ID and secret: on their tab where the instance offers SSO, else alone. -->
+          <ng-template #clientFields>
+            <div class="grid gap-5">
+              <hlm-field class="gap-2">
+                <label hlmFieldLabel for="login-client-id">Client ID</label>
+                <input
+                  hlmInput
+                  id="login-client-id"
+                  class="bg-white dark:bg-white/5 h-12 rounded-xl px-4"
+                  formControlName="clientId"
+                  autocomplete="username"
+                  spellcheck="false"
+                />
+                <hlm-field-error validator="required">Enter the client ID.</hlm-field-error>
+              </hlm-field>
+
+              <hlm-field class="gap-2">
+                <label hlmFieldLabel for="login-client-secret">Client secret</label>
+                <hlm-input-group class="bg-white dark:bg-white/5 h-12 rounded-xl">
+                  <input
+                    #clientSecretInput
+                    hlmInputGroupInput
+                    id="login-client-secret"
+                    class="ps-4"
+                    formControlName="clientSecret"
+                    autocomplete="current-password"
+                    spellcheck="false"
+                    [type]="hideClientSecret() ? 'password' : 'text'"
+                  />
+                  <hlm-input-group-addon align="inline-end" class="pe-2">
+                    <button
+                      hlmInputGroupButton
+                      size="icon-sm"
+                      type="button"
+                      class="rounded-lg"
+                      (click)="toggleClientSecretVisibility()"
+                      aria-label="Show client secret"
+                      [attr.aria-pressed]="!hideClientSecret()"
+                      [hlmTooltip]="hideClientSecret() ? 'Show secret' : 'Hide secret'"
+                    >
+                      <ng-icon [name]="hideClientSecret() ? 'lucideEye' : 'lucideEyeOff'" />
+                    </button>
+                  </hlm-input-group-addon>
+                </hlm-input-group>
+                <hlm-field-error validator="required">Enter the client secret.</hlm-field-error>
+              </hlm-field>
+            </div>
+          </ng-template>
+
+          @if (isSsoTabDisabled()) {
+          <ng-container [ngTemplateOutlet]="clientFields" />
+          } @else {
+          <hlm-tabs [tab]="selectedLoginMode()" (tabActivated)="onLoginTabChange($event)">
+            <hlm-tabs-list
+              class="grid h-12 w-full grid-cols-2 rounded-xl bg-[#eceefb] p-1 group-data-horizontal/tabs:h-12 dark:bg-white/6"
+              aria-label="Sign-in method"
+            >
+              <button hlmTabsTrigger="sso" type="button" class="h-full rounded-lg">
+                <ng-icon name="lucideBuilding2" aria-hidden="true" />
+                Single sign-on
+              </button>
+              <button hlmTabsTrigger="client" type="button" class="h-full rounded-lg">
+                <ng-icon name="lucideKeyRound" aria-hidden="true" />
+                Client ID &amp; secret
+              </button>
+            </hlm-tabs-list>
+
+            <div hlmTabsContent="sso" class="pt-5">
+              <p
+                class="text-muted-foreground flex gap-3 rounded-xl bg-[#f4f5fc] p-4 text-sm leading-relaxed dark:bg-white/5"
+              >
+                <ng-icon
+                  name="lucideBuilding2"
+                  class="text-primary mt-0.5 shrink-0 text-base"
+                  aria-hidden="true"
+                />
+                You sign in at your organization's identity provider and come back here.
+              </p>
+            </div>
+
+            <div hlmTabsContent="client" class="pt-5">
+              <ng-container [ngTemplateOutlet]="clientFields" />
+            </div>
+          </hlm-tabs>
+          }
+
+          <div class="grid gap-2 pt-1">
+            <!-- Stays focusable while unavailable; the reason is said below it, not in a tooltip. -->
+            <button
+              hlmBtn
+              size="lg"
+              type="submit"
+              class="h-12 w-full rounded-xl bg-[linear-gradient(135deg,#6b74ff_0%,#343dff_50%,#232ad0_100%)] text-[0.95rem] font-semibold text-white shadow-[0_14px_30px_-12px_rgba(52,61,255,0.85),inset_0_1px_0_rgba(255,255,255,0.22)] transition-[filter,box-shadow] hover:brightness-110 aria-disabled:cursor-not-allowed aria-disabled:opacity-60 aria-disabled:hover:brightness-100"
+              [attr.aria-disabled]="loginUnavailableReason() ? true : null"
+              [attr.aria-describedby]="unavailableHint() ? 'login-unavailable' : null"
+            >
+              @if (loading()) {
+              <hlm-spinner class="size-4" aria-hidden="true" />
+              {{ loadingLabel() }} } @else { {{ submitLabel() }} }
+            </button>
+            @if (unavailableHint(); as hint) {
+            <p id="login-unavailable" class="text-muted-foreground text-center text-xs">
+              {{ hint }}
+            </p>
+            }
+          </div>
+        </form>
+        }
+
+        <p class="text-muted-foreground mt-8 text-center text-sm">
+          Trouble signing in?
+          <a
+            class="text-primary font-medium underline-offset-4 hover:underline"
+            href="https://docs.eudiplo.dev/"
+            target="_blank"
+            rel="noopener"
+            >Read the guide</a
+          >
+        </p>
+      </div>
+    </main>
+  </div>
+</div>

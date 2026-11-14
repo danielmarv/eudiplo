@@ -1,0 +1,131 @@
+<app-ownership-notice class="mb-6 block empty:hidden" kind="Tenant" [resource]="owner()" />
+
+<app-page-header
+  heading="Status list settings"
+  description="How this tenant's status lists are sized, signed and published. A setting you leave empty follows the instance's default."
+>
+  <a hlmBtn variant="ghost" routerLink="/status-lists">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    Status lists
+  </a>
+</app-page-header>
+
+@if (settings.isPending()) {
+<div role="status" aria-label="Loading the status list settings" class="grid max-w-4xl gap-6">
+  <hlm-skeleton class="h-96 w-full rounded-2xl" />
+</div>
+} @else if (settings.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  <p class="font-semibold">The status list settings could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(settings.error()) }}</p>
+  <button hlmBtn variant="outline" type="button" (click)="settings.refetch()">Retry</button>
+</section>
+} @else {
+<form #formElement class="grid max-w-4xl gap-6" [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="settings-heading"
+  >
+    <div class="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 id="settings-heading" class="font-semibold">This tenant's settings</h2>
+        <p class="text-muted-foreground mt-1 text-sm" data-testid="stored">
+          @if (stored()) { The tenant sets {{ stored() }} of 5 itself. } @else { The tenant follows
+          the instance's defaults. }
+        </p>
+      </div>
+    </div>
+    <div
+      class="bg-muted/50 text-muted-foreground mb-6 flex gap-2.5 rounded-xl px-4 py-3 text-sm"
+      role="note"
+    >
+      <ng-icon name="lucideInfo" class="mt-0.5 shrink-0" aria-hidden="true" />
+      <p>
+        Entries and status size apply to lists created afterwards; existing lists keep theirs. The
+        others apply to every list the next time it is signed.
+      </p>
+    </div>
+    <fieldset [disabled]="!!locked()" class="disabled:opacity-60">
+      <legend class="sr-only">Status list settings</legend>
+      <app-status-list-settings-fields [form]="form" />
+    </fieldset>
+  </section>
+
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    @if (stored() && !locked()) {
+    <button
+      hlmBtn
+      variant="ghost"
+      type="button"
+      class="hover:text-destructive"
+      [attr.aria-disabled]="busy() || null"
+      (click)="!busy() && confirmingReset.set(true)"
+    >
+      <ng-icon name="lucideRotateCcw" aria-hidden="true" />
+      Reset to instance defaults
+    </button>
+    } @else {
+    <span></span>
+    }
+    <div class="flex flex-wrap gap-2">
+      @if (locked()) {
+      <span id="settings-locked" class="sr-only">{{ locked() }}</span>
+      <button
+        hlmBtn
+        type="button"
+        class="cursor-not-allowed opacity-50"
+        aria-disabled="true"
+        aria-describedby="settings-locked"
+        [hlmTooltip]="locked()"
+      >
+        <ng-icon name="lucideLock" aria-hidden="true" />
+        Save settings
+      </button>
+      } @else { @if (form.dirty) {
+      <button hlmBtn variant="ghost" type="button" (click)="discard()">Discard changes</button>
+      }
+      <button hlmBtn type="submit" [attr.aria-disabled]="busy() || null">
+        @if (busy()) {
+        <hlm-spinner class="size-4" aria-hidden="true" />
+        Saving… } @else { Save settings }
+      </button>
+      }
+    </div>
+  </div>
+</form>
+}
+
+<hlm-alert-dialog
+  [state]="confirmingReset() ? 'open' : 'closed'"
+  (stateChanged)="onResetDialog($event)"
+>
+  <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+    <hlm-alert-dialog-header>
+      <h2 hlmAlertDialogTitle>Reset to the instance defaults?</h2>
+      <p hlmAlertDialogDescription>{{ consequences() }} It cannot be undone.</p>
+    </hlm-alert-dialog-header>
+    <hlm-alert-dialog-footer>
+      <button hlmAlertDialogCancel type="button" [disabled]="busy()" (click)="ctx.close()">
+        Cancel
+      </button>
+      <button
+        hlmAlertDialogAction
+        variant="destructive"
+        type="button"
+        [disabled]="busy()"
+        (click)="reset()"
+      >
+        {{ busy() ? 'Resetting…' : 'Reset settings' }}
+      </button>
+    </hlm-alert-dialog-footer>
+  </hlm-alert-dialog-content>
+</hlm-alert-dialog>

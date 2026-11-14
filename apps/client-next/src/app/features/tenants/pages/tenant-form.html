@@ -1,0 +1,265 @@
+<app-page-header
+  [heading]="editing() ? 'Edit tenant' : 'Add tenant'"
+  [description]="editing() ? 'Change how the tenant is named and described, and the settings it sets for itself.' : 'An organization that issues or verifies credentials, with its own clients, keys and configuration.'"
+/>
+
+@if (editing() && tenant.isPending()) {
+<div
+  role="status"
+  aria-label="Loading the tenant"
+  class="grid max-w-[84rem] gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]"
+>
+  <hlm-skeleton class="h-96 w-full rounded-2xl" />
+  <hlm-skeleton class="hidden h-72 rounded-2xl xl:block" />
+</div>
+} @else if (editing() && tenant.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-14 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  <p class="font-semibold">The tenant could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">
+    {{ errorMessage(tenant.error()) }} It can be edited once it has loaded.
+  </p>
+  <div class="flex flex-wrap justify-center gap-2">
+    <button hlmBtn variant="outline" type="button" (click)="tenant.refetch()">Retry</button>
+    <a hlmBtn variant="ghost" routerLink="/tenants">All tenants</a>
+  </div>
+</section>
+} @else {
+<!-- On a wide screen a summary of what saving does, with the buttons, stays next to the form. -->
+<div class="grid max-w-[84rem] items-start gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] xl:gap-8">
+  <form
+    #formElement
+    id="tenant-form"
+    class="@container grid min-w-0 gap-6"
+    [formGroup]="form"
+    (ngSubmit)="submit()"
+    novalidate
+  >
+    <!-- Each part: its heading and what it is for, then its fields across the card. -->
+    <section
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-7 dark:ring-white/8"
+      aria-labelledby="identity-heading"
+    >
+      <div class="mb-6">
+        <h2 id="identity-heading" class="font-semibold">Identity</h2>
+        <p class="text-muted-foreground mt-1 text-sm leading-relaxed">
+          How the tenant appears in the Web Client, and to wallets.
+        </p>
+      </div>
+      <div class="grid items-start gap-5 @2xl:grid-cols-2">
+        <hlm-field class="gap-2">
+          <label hlmFieldLabel for="tenant-name">Name</label>
+          <input
+            hlmInput
+            id="tenant-name"
+            class="h-10"
+            formControlName="name"
+            autocomplete="organization"
+            placeholder="Acme Bank"
+          />
+          <hlm-field-error validator="required">Enter a name.</hlm-field-error>
+        </hlm-field>
+
+        <hlm-field class="gap-2">
+          <label hlmFieldLabel for="tenant-id">Tenant ID</label>
+          <hlm-input-group class="h-10">
+            <input
+              hlmInputGroupInput
+              id="tenant-id"
+              class="font-mono"
+              formControlName="id"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="acme-bank"
+            />
+            @if (!editing()) {
+            <hlm-input-group-addon align="inline-end" class="pe-2">
+              @if (idFollowsName()) {
+              <span class="text-muted-foreground text-xs whitespace-nowrap">From the name</span>
+              } @else {
+              <button
+                hlmInputGroupButton
+                type="button"
+                class="whitespace-nowrap"
+                hlmTooltip="Make the ID follow the name again"
+                (click)="followName()"
+              >
+                <ng-icon name="lucideRotateCcw" aria-hidden="true" />
+                Use the name
+              </button>
+              }
+            </hlm-input-group-addon>
+            }
+          </hlm-input-group>
+          @if (editing()) {
+          <p hlmFieldDescription>The ID cannot be changed.</p>
+          } @else {
+          <p hlmFieldDescription>
+            Lowercase letters, digits, - and _, starting with a letter or digit, at most 63
+            characters. It cannot be changed later.
+          </p>
+          }
+          <hlm-field-error validator="required">Enter an ID.</hlm-field-error>
+          <hlm-field-error validator="pattern">
+            Use lowercase letters, digits, - and _, start with a letter or digit, at most 63
+            characters.
+          </hlm-field-error>
+          <!-- The summary shows it on a wide screen. -->
+          <p class="text-muted-foreground text-sm xl:hidden">
+            Wallets find it at
+            <code class="text-foreground font-mono text-[0.8125rem] [overflow-wrap:anywhere]"
+              >{{ issuerUrl() }}</code
+            >.
+          </p>
+        </hlm-field>
+
+        <hlm-field class="gap-2 @2xl:col-span-2">
+          <label hlmFieldLabel for="tenant-description">
+            Description <span class="text-muted-foreground font-normal">(optional)</span>
+          </label>
+          <textarea
+            hlmTextarea
+            id="tenant-description"
+            class="min-h-20"
+            formControlName="description"
+            rows="3"
+          ></textarea>
+          <p hlmFieldDescription>For the people who manage this instance; wallets never see it.</p>
+        </hlm-field>
+      </div>
+    </section>
+
+    @if (!editing()) {
+    <section
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-7 dark:ring-white/8"
+      aria-labelledby="client-heading"
+    >
+      <div class="mb-6 flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+        <div class="max-w-lg">
+          <h2 id="client-heading" class="font-semibold">Admin client</h2>
+          <p class="text-muted-foreground mt-1 text-sm leading-relaxed" id="admin-client-hint">
+            A client that signs in for the tenant and manages its other clients. @if
+            (createsAdminClient()) { Its client ID is
+            <code class="text-foreground font-mono text-[0.8125rem] [overflow-wrap:anywhere]"
+              >{{ tenantId() || 'tenant-id' }}-admin</code
+            >; its secret is shown once, right after adding. }
+          </p>
+        </div>
+        @if (!providerManagesClients()) {
+        <label
+          class="flex cursor-pointer items-center gap-3 text-sm font-medium"
+          for="tenant-admin-client"
+        >
+          Create one
+          <hlm-switch
+            inputId="tenant-admin-client"
+            formControlName="createAdminClient"
+            aria-label="Create an admin client"
+            aria-describedby="admin-client-hint"
+          />
+        </label>
+        }
+      </div>
+
+      @if (providerManagesClients()) {
+      <p class="bg-muted/60 rounded-xl px-4 py-3 text-sm leading-relaxed">
+        No admin client is created: this instance's identity provider manages the clients. Create
+        the tenant's clients there.
+      </p>
+      } @else { @if (createsAdminClient()) {
+      <div class="border-t pt-5">
+        <h3 class="text-sm font-medium">Its roles</h3>
+        <p class="text-muted-foreground mt-1 mb-4 max-w-3xl text-sm leading-relaxed">
+          It can give other clients only the roles it has, unless it has tenant:admin, which lets it
+          give every role except tenants:manage and tenant:admin.
+        </p>
+        <app-role-picker [selected]="roles()" (selectedChange)="setRoles($event)" />
+      </div>
+      } @else {
+      <p class="text-muted-foreground text-sm">
+        Add the tenant's clients later, under API clients.
+      </p>
+      } }
+    </section>
+    }
+
+    <section
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-7 dark:ring-white/8"
+      aria-labelledby="settings-heading"
+    >
+      <div class="flex flex-wrap items-start justify-between gap-x-6 gap-y-4">
+        <div class="max-w-lg">
+          <h2 id="settings-heading" class="font-semibold">Settings</h2>
+          <p class="text-muted-foreground mt-1 text-sm leading-relaxed">
+            Session data and status lists, only where the tenant differs from the instance. What
+            stays empty follows the instance's defaults.
+          </p>
+        </div>
+        <button
+          hlmBtn
+          variant="outline"
+          type="button"
+          aria-controls="tenant-settings"
+          [attr.aria-expanded]="settingsOpen()"
+          (click)="settingsOpen.set(!settingsOpen())"
+        >
+          @if (ownSettings()) { {{ ownSettings() }} of its own } @else { Instance defaults }
+          <ng-icon
+            name="lucideChevronDown"
+            class="transition-transform"
+            [class.rotate-180]="settingsOpen()"
+            aria-hidden="true"
+          />
+        </button>
+      </div>
+      <div id="tenant-settings" [hidden]="!settingsOpen()">
+        @if (settingsOpen()) {
+        <app-tenant-settings-fields class="mt-6 border-t pt-6" [form]="form.controls.settings" />
+        }
+      </div>
+    </section>
+
+    <!-- On a narrow screen the buttons stay at the foot of the window. -->
+    <div
+      class="bg-background/90 sticky bottom-0 z-10 -mx-4 flex flex-wrap items-center justify-end gap-2 border-t px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 xl:hidden"
+    >
+      <a hlmBtn variant="ghost" [routerLink]="back()">Cancel</a>
+      <button hlmBtn type="submit" [attr.aria-disabled]="saving() || null">
+        {{ submitLabel() }}
+      </button>
+    </div>
+  </form>
+
+  <app-tenant-summary
+    class="sticky top-20 hidden xl:block"
+    [name]="name()"
+    [id]="tenantId()"
+    [issuerUrl]="issuerUrl()"
+    [editing]="editing()"
+    [adminClient]="createsAdminClient()"
+    [roles]="roles().length"
+    [ownSettings]="ownSettings()"
+  >
+    <button
+      hlmBtn
+      type="submit"
+      form="tenant-form"
+      class="w-full"
+      [attr.aria-disabled]="saving() || null"
+    >
+      {{ submitLabel() }}
+    </button>
+    <a hlmBtn variant="ghost" class="w-full" [routerLink]="back()">Cancel</a>
+  </app-tenant-summary>
+</div>
+}
+
+<app-client-secret-dialog [credentials]="createdClient()" (closed)="secretSaved()" />

@@ -1,0 +1,363 @@
+<!-- First focusable element: lets keyboard users jump past the navigation. -->
+<a
+  href="#main-content"
+  class="bg-primary text-primary-foreground sr-only z-50 rounded-md px-3 py-2 focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+  (click)="skipToMainContent($event)"
+  >Skip to main content</a
+>
+
+<div hlmSidebarWrapper>
+  <!-- Floating: a rounded panel set off from the window edges, the pages unchanged beside it. -->
+  <hlm-sidebar
+    collapsible="icon"
+    variant="floating"
+    srOnlySheetTitle="Navigation"
+    srOnlySheetDescription="Pages of the EUDIPLO Web Client"
+    class="[&_[data-slot=sidebar-inner]]:rounded-2xl [&_[data-slot=sidebar-inner]]:shadow-[0_1px_2px_rgba(16,24,64,0.05),0_18px_40px_-24px_rgba(27,33,96,0.35)] [&_[data-slot=sidebar-inner]]:ring-black/6 dark:[&_[data-slot=sidebar-inner]]:ring-white/8"
+  >
+    <!-- The workspace: this console of one instance, with what can be done with the instance. -->
+    <hlm-sidebar-header class="p-2">
+      <ul hlmSidebarMenu>
+        <li hlmSidebarMenuItem>
+          <button
+            hlmSidebarMenuButton
+            size="lg"
+            [hlmDropdownMenuTrigger]="workspaceMenu"
+            align="start"
+            [tooltip]="instanceHost"
+            class="rounded-xl"
+          >
+            <span
+              class="grid size-8 shrink-0 place-items-center rounded-lg bg-[linear-gradient(135deg,#6b74ff,#343dff)] shadow-[0_6px_14px_-6px_rgba(52,61,255,0.8),inset_0_1px_0_rgba(255,255,255,0.25)]"
+              aria-hidden="true"
+            >
+              <app-diplo-logo class="h-4 w-6.5 [--diplo-body:#ffffff] [--diplo-fold:#ffb787]" />
+            </span>
+            <span class="grid min-w-0 flex-1 text-start leading-tight">
+              <span
+                class="text-sidebar-accent-foreground text-[0.9375rem] font-semibold tracking-tight"
+                >EUDIPLO</span
+              >
+              <span class="text-sidebar-foreground/65 truncate text-xs"
+                >{{ caller()?.tenantId ?? 'All tenants' }}</span
+              >
+            </span>
+            <ng-icon name="lucideChevronsUpDown" class="text-sidebar-foreground/50 ms-auto" />
+          </button>
+        </li>
+      </ul>
+    </hlm-sidebar-header>
+
+    <!-- The list scrolls under a soft fade at its foot. -->
+    <hlm-sidebar-content
+      class="px-1 pb-6 [mask-image:linear-gradient(to_bottom,black_calc(100%-1.5rem),transparent)]"
+    >
+      <nav aria-label="Main">
+        @for (group of navigation(); track group.label) { @let open = groupOpen(group.label);
+        <!-- In icon mode the labels hide; a line keeps the groups apart. -->
+        <div
+          hlmSidebarGroup
+          class="py-1 group-data-[collapsible=icon]:not-first:mt-1 group-data-[collapsible=icon]:not-first:border-t group-data-[collapsible=icon]:not-first:border-sidebar-border group-data-[collapsible=icon]:not-first:pt-2"
+        >
+          @if (group.label !== 'Overview') {
+          <button
+            hlmSidebarGroupLabel
+            type="button"
+            class="text-sidebar-foreground/55 hover:text-sidebar-accent-foreground mb-0.5 h-7 w-full cursor-pointer justify-between text-[0.6875rem] font-semibold tracking-wide transition-colors"
+            [attr.aria-expanded]="open"
+            [attr.aria-controls]="groupId(group.label)"
+            (click)="toggleGroup(group.label)"
+          >
+            {{ group.label }}
+            <span class="flex items-center gap-1.5">
+              @if (!open) {
+              <span
+                class="bg-sidebar-accent text-sidebar-foreground/70 rounded-full px-1.5 text-[0.625rem] leading-4 font-medium tabular-nums"
+                >{{ group.items.length }}</span
+              >
+              }
+              <ng-icon
+                name="lucideChevronRight"
+                class="text-[0.75rem] transition-transform duration-200"
+                [class.rotate-90]="open"
+                aria-hidden="true"
+              />
+            </span>
+          </button>
+          }
+          <!-- Rows of 0fr or 1fr slide the group open and shut; inert keeps a closed one out of Tab. -->
+          <div
+            hlmSidebarGroupContent
+            [id]="groupId(group.label)"
+            class="grid transition-[grid-template-rows] duration-200 ease-out"
+            [style.grid-template-rows]="open ? '1fr' : '0fr'"
+            [attr.inert]="open ? null : ''"
+          >
+            <ul hlmSidebarMenu class="min-h-0 gap-0.5 overflow-hidden">
+              @for (item of group.items; track item.path) {
+              <li hlmSidebarMenuItem>
+                <!-- The current page is a soft pill in the brand blue. -->
+                <a
+                  hlmSidebarMenuButton
+                  [routerLink]="item.path"
+                  routerLinkActive
+                  #active="routerLinkActive"
+                  ariaCurrentWhenActive="page"
+                  [isActive]="active.isActive"
+                  [tooltip]="item.label"
+                  class="text-sidebar-foreground h-9 gap-2.5 rounded-lg px-2.5 text-[0.8125rem] transition-colors data-[active=true]:bg-sidebar-primary/10 data-[active=true]:font-medium data-[active=true]:text-sidebar-primary dark:data-[active=true]:bg-sidebar-primary/14"
+                >
+                  <ng-icon [name]="item.icon" />
+                  <span>{{ item.label }}</span>
+                </a>
+              </li>
+              }
+            </ul>
+          </div>
+        </div>
+        }
+      </nav>
+    </hlm-sidebar-content>
+
+    <hlm-sidebar-footer class="p-2">
+      <ul hlmSidebarMenu>
+        <li hlmSidebarMenuItem>
+          <!-- A card for the account; in icon mode only the avatar. -->
+          <button
+            hlmSidebarMenuButton
+            size="lg"
+            [hlmDropdownMenuTrigger]="accountMenu"
+            align="start"
+            side="top"
+            [tooltip]="accountName()"
+            class="bg-sidebar-accent/50 ring-sidebar-border hover:bg-sidebar-accent rounded-xl ring-1 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:ring-0"
+          >
+            <span class="relative shrink-0" aria-hidden="true">
+              <span
+                class="grid size-8 place-items-center rounded-lg bg-[linear-gradient(135deg,#6b74ff,#343dff)] text-[0.7rem] font-semibold text-white"
+                >{{ initials() }}</span
+              >
+              <!-- Green while the instance answers. -->
+              <span
+                class="ring-sidebar absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2"
+                [class]="version.isError() ? 'bg-destructive' : version.isSuccess() ? 'bg-success' : 'bg-muted-foreground/40'"
+              ></span>
+            </span>
+            <span class="grid min-w-0 flex-1 text-start leading-tight">
+              <span class="text-sidebar-accent-foreground truncate text-sm font-medium"
+                >{{ accountName() }}</span
+              >
+              @if (singleRole(); as role) {
+              <span class="text-sidebar-foreground/65 truncate font-mono text-[0.7rem]"
+                >{{ role }}</span
+              >
+              } @else {
+              <span class="text-sidebar-foreground/65 truncate text-xs"
+                >{{ roleCount() }} {{ roleCount() === 1 ? 'role' : 'roles' }}</span
+              >
+              }
+            </span>
+            <ng-icon name="lucideChevronsUpDown" class="text-sidebar-foreground/50 ms-auto" />
+          </button>
+        </li>
+      </ul>
+    </hlm-sidebar-footer>
+
+    <!-- A click on the sidebar's edge collapses it to icons, or expands it again. -->
+    <button hlmSidebarRail aria-label="Collapse or expand the navigation"></button>
+  </hlm-sidebar>
+
+  <main hlmSidebarInset id="main-content" #mainContent tabindex="-1" class="outline-none">
+    <header
+      class="bg-background/85 sticky top-0 z-20 flex h-14 shrink-0 items-center gap-3 border-b px-3 backdrop-blur-md sm:px-5"
+    >
+      <!-- The trigger renders its icon and its screen-reader label itself. -->
+      <!-- eslint-disable-next-line @angular-eslint/template/elements-content -->
+      <button hlmSidebarTrigger srOnlyText="Toggle navigation"></button>
+      <span class="bg-border hidden h-5 w-px sm:block" aria-hidden="true"></span>
+
+      <nav aria-label="Breadcrumb" class="min-w-0">
+        <ol class="flex min-w-0 items-center gap-1.5 text-sm">
+          @for (crumb of crumbs(); track crumb.label; let last = $last) {
+          <!-- On a phone only the page itself; its section from sm up. -->
+          <li
+            [class]="last ? 'flex min-w-0 items-center gap-1.5' : 'hidden min-w-0 items-center gap-1.5 sm:flex'"
+          >
+            @if (last) {
+            <span class="truncate font-medium" aria-current="page">{{ crumb.label }}</span>
+            } @else if (crumb.path) {
+            <a
+              [routerLink]="crumb.path"
+              class="text-muted-foreground hover:text-foreground truncate"
+              >{{ crumb.label }}</a
+            >
+            } @else {
+            <span class="text-muted-foreground truncate">{{ crumb.label }}</span>
+            } @if (!last) {
+            <ng-icon
+              name="lucideChevronRight"
+              class="text-muted-foreground/60 shrink-0 text-xs"
+              aria-hidden="true"
+            />
+            }
+          </li>
+          }
+        </ol>
+      </nav>
+
+      <div class="flex-1"></div>
+
+      <button
+        type="button"
+        class="bg-card text-muted-foreground hover:text-foreground hidden h-9 w-60 items-center gap-2 rounded-lg border px-3 text-sm shadow-xs transition-colors md:flex lg:w-72"
+        (click)="palette.set('open')"
+      >
+        <ng-icon name="lucideSearch" aria-hidden="true" />
+        Search pages…
+        <kbd
+          class="bg-muted text-muted-foreground ms-auto rounded border px-1.5 py-0.5 font-mono text-[0.65rem]"
+          >{{ shortcut }}</kbd
+        >
+      </button>
+      <button
+        hlmBtn
+        variant="ghost"
+        size="icon"
+        class="md:hidden"
+        aria-label="Search pages"
+        (click)="palette.set('open')"
+      >
+        <ng-icon name="lucideSearch" />
+      </button>
+
+      <!-- Whether the instance answers, and its version. -->
+      <span
+        class="text-muted-foreground hidden items-center gap-2 rounded-lg border px-2.5 py-1.5 text-xs lg:flex"
+        role="status"
+      >
+        <span
+          class="size-2 rounded-full"
+          [class]="version.isError() ? 'bg-destructive' : version.isSuccess() ? 'bg-success' : 'bg-muted-foreground/40'"
+          aria-hidden="true"
+        ></span>
+        <span class="font-mono">{{ instanceHost }}</span>
+        @if (version.isError()) {
+        <span class="text-destructive">not answering</span>
+        } @else if (versionLabel(); as label) {
+        <span class="text-muted-foreground/70">{{ label }}</span>
+        }
+      </span>
+
+      <button
+        hlmBtn
+        variant="ghost"
+        size="icon"
+        class="text-muted-foreground"
+        [hlmDropdownMenuTrigger]="helpMenu"
+        align="end"
+        aria-label="Help and resources"
+        hlmTooltip="Help and resources"
+      >
+        <ng-icon name="lucideCircleHelp" />
+      </button>
+      <button
+        hlmBtn
+        variant="ghost"
+        size="icon"
+        class="text-muted-foreground"
+        (click)="theme.toggle()"
+        [attr.aria-label]="theme.darkMode() ? 'Switch to light mode' : 'Switch to dark mode'"
+        [hlmTooltip]="theme.darkMode() ? 'Light mode' : 'Dark mode'"
+      >
+        <ng-icon [name]="theme.darkMode() ? 'lucideSun' : 'lucideMoon'" />
+      </button>
+    </header>
+
+    <div class="mx-auto w-full max-w-[120rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">
+      <router-outlet />
+    </div>
+  </main>
+</div>
+
+<app-command-palette [navigation]="navigation()" [(state)]="palette" (logout)="logout()" />
+
+<ng-template #workspaceMenu>
+  <hlm-dropdown-menu class="w-72">
+    <hlm-dropdown-menu-label class="grid gap-0.5 font-normal">
+      <span class="text-muted-foreground text-xs">Instance</span>
+      <span class="truncate font-mono text-xs">{{ instanceUrl }}</span>
+      <span class="text-muted-foreground truncate text-xs">{{ workspaceDetail() }}</span>
+    </hlm-dropdown-menu-label>
+    <hlm-dropdown-menu-separator />
+    <button hlmDropdownMenuItem (triggered)="copyInstanceUrl()">
+      <ng-icon name="lucideCopy" />
+      Copy instance address
+    </button>
+    @if (apiReference) {
+    <a hlmDropdownMenuItem [href]="apiReference" target="_blank" rel="noopener">
+      <ng-icon name="lucideCodeXml" />
+      API reference
+      <ng-icon name="lucideExternalLink" class="text-muted-foreground ms-auto" />
+    </a>
+    }
+    <hlm-dropdown-menu-separator />
+    <button hlmDropdownMenuItem (triggered)="logout()">
+      <ng-icon name="lucideLogIn" />
+      Sign in to another instance
+    </button>
+  </hlm-dropdown-menu>
+</ng-template>
+
+<ng-template #accountMenu>
+  <hlm-dropdown-menu class="w-72">
+    <hlm-dropdown-menu-label class="grid gap-0.5 font-normal">
+      <span class="text-muted-foreground text-xs">Signed in as</span>
+      <span class="truncate font-semibold">{{ accountName() }}</span>
+      <span class="text-muted-foreground truncate text-xs">
+        {{ caller()?.tenantId ? 'Tenant ' + caller()?.tenantId : 'All tenants' }}
+      </span>
+      <span class="text-muted-foreground truncate font-mono text-xs">{{ instanceUrl }}</span>
+    </hlm-dropdown-menu-label>
+    <hlm-dropdown-menu-separator />
+    <button hlmDropdownMenuItem (triggered)="theme.toggle()">
+      <ng-icon [name]="theme.darkMode() ? 'lucideSun' : 'lucideMoon'" />
+      {{ theme.darkMode() ? 'Light mode' : 'Dark mode' }}
+    </button>
+    <a hlmDropdownMenuItem href="https://docs.eudiplo.dev/" target="_blank" rel="noopener">
+      <ng-icon name="lucideBookOpen" />
+      Documentation
+    </a>
+    <hlm-dropdown-menu-separator />
+    <button hlmDropdownMenuItem (triggered)="logout()">
+      <ng-icon name="lucideLogOut" />
+      Log out
+    </button>
+  </hlm-dropdown-menu>
+</ng-template>
+
+<ng-template #helpMenu>
+  <hlm-dropdown-menu class="w-64">
+    <a hlmDropdownMenuItem href="https://docs.eudiplo.dev/" target="_blank" rel="noopener">
+      <ng-icon name="lucideBookOpen" />
+      Documentation
+      <ng-icon name="lucideExternalLink" class="text-muted-foreground ms-auto" />
+    </a>
+    @if (apiReference) {
+    <a hlmDropdownMenuItem [href]="apiReference" target="_blank" rel="noopener">
+      <ng-icon name="lucideCodeXml" />
+      API reference of this instance
+      <ng-icon name="lucideExternalLink" class="text-muted-foreground ms-auto" />
+    </a>
+    }
+    <a hlmDropdownMenuItem href="https://github.com/EUDIPLO/eudiplo" target="_blank" rel="noopener">
+      <ng-icon name="lucideCodeXml" />
+      Source code on GitHub
+      <ng-icon name="lucideExternalLink" class="text-muted-foreground ms-auto" />
+    </a>
+    <a hlmDropdownMenuItem href="https://discord.gg/58ys8XfXDu" target="_blank" rel="noopener">
+      <ng-icon name="lucideMessagesSquare" />
+      Discord community
+      <ng-icon name="lucideExternalLink" class="text-muted-foreground ms-auto" />
+    </a>
+  </hlm-dropdown-menu>
+</ng-template>

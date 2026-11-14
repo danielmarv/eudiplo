@@ -1,0 +1,218 @@
+<app-ownership-notice class="mb-6 block empty:hidden" kind="StatusList" [resource]="owner()" />
+
+@if (list.isPending()) {
+<div role="status" aria-label="Loading the status list" class="grid gap-6">
+  <hlm-skeleton class="h-10 w-72 rounded-lg" />
+  <hlm-skeleton class="h-56 w-full rounded-2xl" />
+  <hlm-skeleton class="h-48 w-full rounded-2xl" />
+</div>
+} @else if (list.isError()) {
+<section
+  class="bg-card grid justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  @if (notFound(list.error())) {
+  <h1 class="text-lg font-semibold">There is no status list {{ listId() }}</h1>
+  <p class="text-muted-foreground max-w-md text-sm">
+    It may have been deleted, or the address has a typo.
+  </p>
+  <a hlmBtn variant="outline" routerLink="/status-lists">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    All status lists
+  </a>
+  } @else {
+  <h1 class="text-lg font-semibold">The status list could not be loaded</h1>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(list.error()) }}</p>
+  <div class="flex flex-wrap justify-center gap-2">
+    <button hlmBtn variant="outline" type="button" (click)="list.refetch()">Retry</button>
+    <a hlmBtn variant="ghost" routerLink="/status-lists">All status lists</a>
+  </div>
+  }
+</section>
+} @else if (list.data(); as current) {
+<app-page-header heading="Status list">
+  @if (undeletable()) {
+  <span id="list-undeletable" class="sr-only">{{ undeletable() }}</span>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    class="cursor-not-allowed opacity-50"
+    aria-disabled="true"
+    aria-describedby="list-undeletable"
+    [hlmTooltip]="undeletable()"
+  >
+    <ng-icon name="lucideTrash2" aria-hidden="true" />
+    Delete
+  </button>
+  } @else {
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    class="hover:border-destructive/40 hover:text-destructive"
+    (click)="toDelete.set(current)"
+  >
+    <ng-icon name="lucideTrash2" aria-hidden="true" />
+    Delete
+  </button>
+  }
+</app-page-header>
+
+<!-- What the list is: its ID and the address relying parties fetch, and how full it is. -->
+<section
+  class="bg-card rounded-2xl shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+  aria-labelledby="list-heading"
+>
+  <div class="flex flex-wrap items-start gap-4 border-b p-5 sm:p-6">
+    <span
+      class="bg-accent text-accent-foreground grid size-11 shrink-0 place-items-center rounded-xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideListChecks" class="text-lg" />
+    </span>
+    <div class="min-w-0 flex-1">
+      <h2 id="list-heading" class="font-mono text-sm font-semibold break-all">{{ current.id }}</h2>
+      <div class="mt-1.5 flex min-w-0 items-center gap-1">
+        <span class="sr-only">Address: </span>
+        <a
+          [href]="current.uri"
+          target="_blank"
+          rel="noopener"
+          class="text-muted-foreground hover:text-foreground min-w-0 truncate font-mono text-xs hover:underline"
+          [title]="current.uri"
+          >{{ current.uri }}</a
+        >
+        <ng-icon
+          name="lucideExternalLink"
+          class="text-muted-foreground shrink-0 text-xs"
+          aria-hidden="true"
+        />
+        <button
+          type="button"
+          class="text-muted-foreground hover:text-foreground hover:bg-muted ms-1 grid size-6 shrink-0 place-items-center rounded-md"
+          aria-label="Copy the address"
+          hlmTooltip="Copy address"
+          (click)="copyUri(current.uri)"
+        >
+          <ng-icon name="lucideCopy" class="text-[0.8rem]" />
+        </button>
+      </div>
+    </div>
+    @if (token(); as token) {
+    <span
+      class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium {{ token.tone }}"
+      data-testid="token-state"
+    >
+      <ng-icon [name]="token.icon" aria-hidden="true" />
+      {{ token.label }}
+    </span>
+    }
+  </div>
+
+  <div class="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <div>
+      <h3 class="text-sm font-medium">Entries used</h3>
+      <app-usage-meter
+        class="mt-3"
+        [used]="current.usedEntries"
+        [capacity]="current.capacity"
+        [full]="true"
+      />
+      <dl class="mt-4 grid grid-cols-3 gap-3 text-sm">
+        <div class="bg-muted/50 rounded-lg px-3 py-2">
+          <dt class="text-muted-foreground text-xs">Used</dt>
+          <dd class="mt-0.5 font-semibold tabular-nums">{{ count(current.usedEntries) }}</dd>
+        </div>
+        <div class="bg-muted/50 rounded-lg px-3 py-2">
+          <dt class="text-muted-foreground text-xs">Free</dt>
+          <dd class="mt-0.5 font-semibold tabular-nums">{{ count(current.availableEntries) }}</dd>
+        </div>
+        <div class="bg-muted/50 rounded-lg px-3 py-2">
+          <dt class="text-muted-foreground text-xs">Entries</dt>
+          <dd class="mt-0.5 font-semibold tabular-nums">{{ count(current.capacity) }}</dd>
+        </div>
+      </dl>
+    </div>
+    <dl class="divide-y text-sm">
+      <div class="flex gap-3 py-2.5 first:pt-0">
+        <dt class="text-muted-foreground w-32 shrink-0">Status size</dt>
+        <dd>{{ bitLabels[current.bits] }}</dd>
+      </div>
+      <div class="flex gap-3 py-2.5">
+        <dt class="text-muted-foreground w-32 shrink-0">Signed copy</dt>
+        <dd>
+          {{ token()?.detail }} @if (current.expiresAt) {
+          <span class="text-muted-foreground block text-xs">
+            {{ token()?.state === 'expired' ? 'Expired' : 'Expires' }} {{
+            dateTime(current.expiresAt) }}
+          </span>
+          }
+        </dd>
+      </div>
+      <div class="flex gap-3 py-2.5">
+        <dt class="text-muted-foreground w-32 shrink-0">Created</dt>
+        <dd>
+          {{ dateTime(current.createdAt) }}
+          <span class="text-muted-foreground block text-xs"
+            >{{ relativeTime(current.createdAt) }}</span
+          >
+        </dd>
+      </div>
+    </dl>
+  </div>
+</section>
+
+<!-- What it is bound to, which can be changed. -->
+<form
+  class="bg-card mt-6 rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+  aria-labelledby="binding-heading"
+  [formGroup]="form"
+  (ngSubmit)="save()"
+>
+  <h2 id="binding-heading" class="font-semibold">What it serves</h2>
+  <p class="text-muted-foreground mt-1 mb-5 text-sm">
+    Credentials of the type get their entry here. A new key chain signs the list from its next
+    request on.
+  </p>
+  <fieldset [disabled]="!!locked()" class="disabled:opacity-60">
+    <app-status-list-binding-fields [form]="form" />
+  </fieldset>
+  <div class="mt-6 flex flex-wrap items-center justify-end gap-2">
+    @if (locked()) {
+    <span id="list-locked" class="sr-only">{{ locked() }}</span>
+    <button
+      hlmBtn
+      type="button"
+      class="cursor-not-allowed opacity-50"
+      aria-disabled="true"
+      aria-describedby="list-locked"
+      [hlmTooltip]="locked()"
+    >
+      <ng-icon name="lucideLock" aria-hidden="true" />
+      Save changes
+    </button>
+    } @else { @if (form.dirty) {
+    <button hlmBtn variant="ghost" type="button" (click)="discard()">Discard changes</button>
+    }
+    <button hlmBtn type="submit" [attr.aria-disabled]="saving() || null">
+      @if (saving()) {
+      <hlm-spinner class="size-4" aria-hidden="true" />
+      Saving… } @else { Save changes }
+    </button>
+    }
+  </div>
+</form>
+
+<app-delete-status-list-dialog
+  [list]="toDelete()"
+  (closed)="toDelete.set(null)"
+  (deleted)="onDeleted()"
+/>
+}

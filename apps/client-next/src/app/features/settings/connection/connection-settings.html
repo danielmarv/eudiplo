@@ -1,0 +1,403 @@
+<div class="max-w-[84rem]">
+  <app-page-header
+    heading="Connection settings"
+    description="The instance you are signed in to, who you are signed in as, and how your session stays signed in."
+  >
+    <button hlmBtn variant="outline" type="button" (click)="signOut()">
+      <ng-icon name="lucideLogOut" aria-hidden="true" />
+      Sign out
+    </button>
+  </app-page-header>
+
+  <div class="grid gap-6">
+    <!--
+    This Web Client and the instance, joined by a line that says whether they talk and come from
+    the same build.
+  -->
+    <section
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+      aria-labelledby="link-heading"
+    >
+      <h2 id="link-heading" class="sr-only">Web Client and instance</h2>
+      <div class="grid items-center gap-x-6 gap-y-4 md:grid-cols-[auto_minmax(8rem,1fr)_auto]">
+        <div class="flex min-w-0 items-center gap-3.5">
+          <span
+            class="bg-primary/10 text-primary grid size-12 shrink-0 place-items-center rounded-xl"
+            aria-hidden="true"
+          >
+            <ng-icon name="lucideMonitor" class="text-xl" />
+          </span>
+          <div class="min-w-0">
+            <p class="text-muted-foreground text-xs">This Web Client</p>
+            <p class="truncate font-semibold">{{ versionLabel(client.version) }}</p>
+            <p class="text-muted-foreground truncate font-mono text-xs">
+              {{ client.revision ? 'commit ' + client.revision.slice(0, 7) : 'Development build' }}
+            </p>
+          </div>
+        </div>
+
+        @switch (link()) { @case ('checking') {
+        <div class="flex items-center gap-2" role="status">
+          <span class="border-border flex-1 border-t-2 border-dashed" aria-hidden="true"></span>
+          <span class="bg-muted text-muted-foreground rounded-full px-3 py-1 text-xs font-medium"
+            >Checking…</span
+          >
+          <span class="border-border flex-1 border-t-2 border-dashed" aria-hidden="true"></span>
+        </div>
+        } @case ('unreachable') {
+        <div class="flex items-center gap-2" role="status">
+          <span
+            class="border-destructive/50 flex-1 border-t-2 border-dashed"
+            aria-hidden="true"
+          ></span>
+          <span
+            class="bg-destructive/10 text-destructive rounded-full px-3 py-1 text-xs font-semibold"
+            >Not answering</span
+          >
+          <span
+            class="border-destructive/50 flex-1 border-t-2 border-dashed"
+            aria-hidden="true"
+          ></span>
+        </div>
+        } @case ('mismatch') {
+        <div class="flex items-center gap-2" role="status">
+          <span class="border-warning/60 flex-1 border-t-2" aria-hidden="true"></span>
+          <span class="bg-warning/12 text-warning rounded-full px-3 py-1 text-xs font-semibold"
+            >Different builds</span
+          >
+          <span class="border-warning/60 flex-1 border-t-2" aria-hidden="true"></span>
+        </div>
+        } @default {
+        <div class="flex items-center gap-2" role="status">
+          <span class="border-success/50 flex-1 border-t-2" aria-hidden="true"></span>
+          <span
+            class="bg-success/12 text-success inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold"
+          >
+            <span class="bg-success size-1.5 rounded-full" aria-hidden="true"></span>
+            {{ link() === 'match' ? 'Same build' : 'Connected' }}
+          </span>
+          <span class="border-success/50 flex-1 border-t-2" aria-hidden="true"></span>
+        </div>
+        } }
+
+        <div class="flex min-w-0 items-center gap-3.5 md:flex-row-reverse md:text-end">
+          <span
+            class="bg-primary/10 text-primary grid size-12 shrink-0 place-items-center rounded-xl"
+            aria-hidden="true"
+          >
+            <ng-icon name="lucideServer" class="text-xl" />
+          </span>
+          <div class="min-w-0">
+            <p class="text-muted-foreground text-xs">Instance</p>
+            <p class="truncate font-semibold">{{ host || 'Not configured' }}</p>
+            <p class="text-muted-foreground truncate font-mono text-xs">
+              @if (version.data(); as backend) { {{ versionLabel(backend.version) }}{{
+              backend.revision ? ', commit ' + backend.revision.slice(0, 7) : '' }} } @else if
+              (version.isError()) { Version unavailable } @else { … }
+            </p>
+          </div>
+        </div>
+      </div>
+
+      @switch (link()) { @case ('mismatch') {
+      <p
+        class="border-warning/30 bg-warning/8 mt-5 flex gap-2.5 rounded-lg border px-3.5 py-3 text-sm"
+      >
+        <ng-icon
+          name="lucideTriangleAlert"
+          class="text-warning mt-0.5 shrink-0"
+          aria-hidden="true"
+        />
+        The Web Client and the backend come from different builds, so some pages may not work. Run
+        the Web Client image with the same tag as the backend.
+      </p>
+      } @case ('unreachable') {
+      <p class="text-muted-foreground mt-5 text-sm">
+        The instance did not answer the version request. Check that it is running and that this
+        browser can reach {{ apiUrl }}.
+      </p>
+      } @case ('unknown') {
+      <p class="text-muted-foreground mt-5 text-sm">
+        The builds cannot be compared: {{ client.version === 'dev' ? 'this Web Client is a
+        development build.' : 'one of them has no release version or commit.' }}
+      </p>
+      } }
+    </section>
+
+    <div class="grid items-start gap-6 lg:grid-cols-2">
+      <!-- The instance. -->
+      <section
+        class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="instance-heading"
+      >
+        <h2 id="instance-heading" class="font-semibold">Instance</h2>
+        <p class="text-muted-foreground mt-1 text-sm">Where this Web Client sends its requests.</p>
+
+        <dl class="mt-4 divide-y text-sm">
+          <div class="grid gap-1 py-3">
+            <dt class="text-muted-foreground">API URL</dt>
+            <dd class="flex items-center justify-between gap-3">
+              <span class="font-mono text-[0.8125rem] [overflow-wrap:anywhere]"
+                >{{ apiUrl || 'Not configured' }}</span
+              >
+              @if (apiUrl) {
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                aria-label="Copy the API URL"
+                hlmTooltip="Copy"
+                (click)="copy(apiUrl, 'API URL')"
+              >
+                <ng-icon name="lucideCopy" />
+              </button>
+              }
+            </dd>
+          </div>
+          <div class="grid gap-1 py-3">
+            <dt class="text-muted-foreground">Public URL, for wallets</dt>
+            <dd class="flex items-center justify-between gap-3">
+              @if (publicUrl(); as url) {
+              <span class="font-mono text-[0.8125rem] [overflow-wrap:anywhere]">{{ url }}</span>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                aria-label="Copy the public URL"
+                hlmTooltip="Copy"
+                (click)="copy(url, 'Public URL')"
+              >
+                <ng-icon name="lucideCopy" />
+              </button>
+              } @else if (config.isPending()) {
+              <hlm-skeleton class="h-4 w-48" />
+              } @else {
+              <span class="text-muted-foreground">Unavailable</span>
+              }
+            </dd>
+          </div>
+          <div class="grid gap-1 py-3">
+            <dt class="text-muted-foreground">Sign-in</dt>
+            <dd>
+              <span class="font-medium">{{ sso ? 'Single sign-on' : 'Client ID and secret' }}</span>
+              @if (authMode(); as mode) {
+              <span class="text-muted-foreground block">Tokens are issued by {{ mode }}.</span>
+              }
+            </dd>
+          </div>
+          <div class="grid gap-1 py-3">
+            <dt class="text-muted-foreground">
+              {{ sso ? 'Identity provider' : 'Token endpoint' }}
+            </dt>
+            <dd class="flex items-center justify-between gap-3">
+              <span class="font-mono text-[0.8125rem] [overflow-wrap:anywhere]"
+                >{{ oauthUrl || 'Not configured' }}</span
+              >
+              @if (oauthUrl) {
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                [attr.aria-label]="'Copy the ' + (sso ? 'identity provider' : 'token endpoint') + ' URL'"
+                hlmTooltip="Copy"
+                (click)="copy(oauthUrl, sso ? 'Identity provider URL' : 'Token endpoint URL')"
+              >
+                <ng-icon name="lucideCopy" />
+              </button>
+              }
+            </dd>
+          </div>
+          <div class="grid gap-1 py-3">
+            <dt class="text-muted-foreground">Configuration import at start-up</dt>
+            <dd>
+              @if (importMode(); as mode) {
+              <span class="font-medium">{{ mode.label }}</span>
+              <span class="text-muted-foreground block">{{ mode.detail }}</span>
+              } @else if (config.isPending()) {
+              <hlm-skeleton class="h-4 w-32" />
+              } @else {
+              <span class="text-muted-foreground">Unavailable</span>
+              }
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <div class="grid gap-6">
+        <!-- Who the Web Client is signed in as. -->
+        <section
+          class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+          aria-labelledby="caller-heading"
+        >
+          <h2 id="caller-heading" class="font-semibold">Signed in as</h2>
+          <p class="text-muted-foreground mt-1 text-sm">As the backend resolved your token.</p>
+
+          <dl class="mt-4 divide-y text-sm">
+            @if (!sso) {
+            <div class="grid gap-1 py-3">
+              <dt class="text-muted-foreground">Client ID</dt>
+              <dd class="flex items-center justify-between gap-3">
+                <span class="font-mono text-[0.8125rem] [overflow-wrap:anywhere]"
+                  >{{ clientId || 'Not configured' }}</span
+                >
+                @if (clientId) {
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-sm"
+                  type="button"
+                  aria-label="Copy the client ID"
+                  hlmTooltip="Copy"
+                  (click)="copy(clientId, 'Client ID')"
+                >
+                  <ng-icon name="lucideCopy" />
+                </button>
+                }
+              </dd>
+            </div>
+            <div class="grid gap-1 py-3">
+              <dt class="text-muted-foreground">Client secret</dt>
+              <dd class="flex items-center justify-between gap-3">
+                @if (secret; as value) {
+                <span class="font-mono text-[0.8125rem] [overflow-wrap:anywhere]">
+                  @if (showSecret()) { {{ value }} } @else {
+                  <span aria-hidden="true">••••••••••••••••</span>
+                  <span class="sr-only">Hidden</span>
+                  }
+                </span>
+                <span class="flex shrink-0 gap-1">
+                  <button
+                    hlmBtn
+                    variant="ghost"
+                    size="icon-sm"
+                    type="button"
+                    aria-label="Show the client secret"
+                    [attr.aria-pressed]="showSecret()"
+                    [hlmTooltip]="showSecret() ? 'Hide' : 'Show'"
+                    (click)="showSecret.set(!showSecret())"
+                  >
+                    <ng-icon [name]="showSecret() ? 'lucideEyeOff' : 'lucideEye'" />
+                  </button>
+                  <button
+                    hlmBtn
+                    variant="ghost"
+                    size="icon-sm"
+                    type="button"
+                    aria-label="Copy the client secret"
+                    hlmTooltip="Copy"
+                    (click)="copy(value, 'Client secret')"
+                  >
+                    <ng-icon name="lucideCopy" />
+                  </button>
+                </span>
+                } @else {
+                <span class="text-muted-foreground">
+                  Not available in this tab: the Web Client keeps it only until a reload.
+                </span>
+                }
+              </dd>
+            </div>
+            } @else if (caller()?.subject; as subject) {
+            <div class="grid gap-1 py-3">
+              <dt class="text-muted-foreground">Subject</dt>
+              <dd class="font-mono text-[0.8125rem] [overflow-wrap:anywhere]">{{ subject }}</dd>
+            </div>
+            }
+            <div class="grid gap-1 py-3">
+              <dt class="text-muted-foreground">Tenant</dt>
+              <dd>
+                @if (caller(); as current) { @if (current.tenantId; as tenant) { @if
+                (opensTenants()) {
+                <a
+                  class="text-primary font-mono text-[0.8125rem] hover:underline"
+                  [routerLink]="['/tenants', tenant]"
+                  >{{ tenant }}</a
+                >
+                } @else {
+                <span class="font-mono text-[0.8125rem]">{{ tenant }}</span>
+                } } @else {
+                <span class="text-muted-foreground">None</span>
+                } } @else {
+                <hlm-skeleton class="h-4 w-24" />
+                }
+              </dd>
+            </div>
+            <div class="grid gap-1.5 py-3">
+              <dt class="text-muted-foreground">Roles</dt>
+              <dd>
+                @if (caller(); as current) {
+                <ul class="flex flex-wrap gap-1.5" aria-label="Your roles">
+                  @for (role of current.roles; track role) {
+                  <li
+                    class="bg-primary/8 text-primary dark:bg-primary/15 rounded-md px-1.5 py-0.5 font-mono text-[0.7rem] font-medium"
+                  >
+                    {{ role }}
+                  </li>
+                  } @empty {
+                  <li class="text-muted-foreground">None</li>
+                  }
+                </ul>
+                } @else {
+                <hlm-skeleton class="h-5 w-40" />
+                }
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <!-- How long the session lasts. -->
+        <section
+          class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+          aria-labelledby="session-heading"
+        >
+          <h2 id="session-heading" class="font-semibold">Session</h2>
+          <p class="text-muted-foreground mt-1 text-sm">How long you stay signed in.</p>
+
+          <div class="mt-4 flex items-center gap-3.5">
+            <span
+              class="bg-muted text-muted-foreground grid size-11 shrink-0 place-items-center rounded-xl"
+              aria-hidden="true"
+            >
+              <ng-icon name="lucideTimer" class="text-lg" />
+            </span>
+            @if (sso) {
+            <p class="text-sm">Your identity provider renews your access token while you work.</p>
+            } @else if (timeLeft() > 0) {
+            <p class="text-sm">
+              <span class="block text-2xl font-semibold tabular-nums">{{ clock() }}</span>
+              <span class="text-muted-foreground">until the access token expires</span>
+            </p>
+            } @else {
+            <p class="text-sm">The access token has expired.</p>
+            }
+          </div>
+
+          <p class="mt-4 flex items-start gap-2.5 text-sm" role="status">
+            @if (renews()) {
+            <span class="bg-success mt-1.5 size-2 shrink-0 rounded-full" aria-hidden="true"></span>
+            <span>Renews itself before it expires.</span>
+            } @else if (rejected()) {
+            <span
+              class="bg-destructive mt-1.5 size-2 shrink-0 rounded-full"
+              aria-hidden="true"
+            ></span>
+            <span
+              >Does not renew: the token endpoint refused the client's credentials. Sign in
+              again.</span
+            >
+            } @else {
+            <span class="bg-warning mt-1.5 size-2 shrink-0 rounded-full" aria-hidden="true"></span>
+            <span
+              >Does not renew: this tab no longer has the client secret, which the Web Client keeps
+              only until a reload. Sign in again when the session ends.</span
+            >
+            }
+          </p>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>

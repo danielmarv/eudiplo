@@ -1,0 +1,376 @@
+<app-page-header
+  heading="New issuance"
+  description="Offer credentials to a wallet: choose how the holder gets them, which ones, and what they hold."
+/>
+
+@if (created(); as result) {
+<app-offer-result
+  class="max-w-4xl"
+  [offer]="result.response"
+  [txCode]="result.txCode"
+  (another)="reset()"
+/>
+} @else if (loading()) {
+<div class="grid max-w-4xl gap-6" role="status" aria-label="Loading the credentials">
+  <hlm-skeleton class="h-12 w-full rounded-xl" />
+  <hlm-skeleton class="h-80 w-full rounded-2xl" />
+</div>
+} @else if (loadError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-14 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  <p class="font-semibold">The offer cannot be prepared</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ loadError() }}</p>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    (click)="configs.refetch(); issuanceConfig.refetch()"
+  >
+    Retry
+  </button>
+</section>
+} @else {
+<div class="grid max-w-4xl gap-6">
+  <!-- The steps: done ones can be opened again, later ones only with Next. -->
+  <nav aria-label="Steps of the offer">
+    <ol class="flex items-center gap-2">
+      @for (label of steps(); track $index; let index = $index, last = $last) {
+      <li class="flex min-w-0 flex-1 items-center gap-2" [class.flex-none]="last">
+        <button
+          type="button"
+          class="flex min-w-0 items-center gap-2.5 rounded-lg py-1 pe-2 text-sm font-medium outline-none focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-default"
+          [class.text-muted-foreground]="index > step()"
+          [disabled]="index >= step()"
+          [attr.aria-current]="index === step() ? 'step' : null"
+          (click)="goTo($any(index))"
+        >
+          <span
+            class="grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold"
+            [class]="index < step() ? 'bg-primary text-primary-foreground' : index === step() ? 'ring-primary text-primary ring-2' : 'bg-muted text-muted-foreground'"
+            aria-hidden="true"
+          >
+            @if (index < step()) {
+            <ng-icon name="lucideCheck" />
+            } @else { {{ index + 1 }} }
+          </span>
+          <span class="truncate">{{ label }}</span>
+          @if (index < step()) {
+          <span class="sr-only">(done)</span>
+          }
+        </button>
+        @if (!last) {
+        <span class="bg-border h-px flex-1" aria-hidden="true"></span>
+        }
+      </li>
+      }
+    </ol>
+  </nav>
+
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-7 dark:ring-white/8"
+    aria-labelledby="step-heading"
+  >
+    @switch (step()) { @case (0) {
+    <h2 id="step-heading" class="font-semibold">How the holder gets the credential</h2>
+    <p class="text-muted-foreground mt-1 text-sm">The flow decides what the next steps ask.</p>
+    <div class="mt-5 grid gap-3" role="radiogroup" aria-labelledby="step-heading">
+      @for (option of flows; track option.value) {
+      <label
+        class="has-checked:border-primary/60 has-checked:bg-primary/5 has-focus-visible:ring-ring/50 flex cursor-pointer items-start gap-4 rounded-xl border p-4 transition-colors has-focus-visible:ring-3"
+      >
+        <input
+          type="radio"
+          name="flow"
+          class="accent-primary mt-1 size-4 shrink-0"
+          [value]="option.value"
+          [checked]="flow() === option.value"
+          (change)="chooseFlow(option.value)"
+        />
+        <span
+          class="bg-accent text-accent-foreground grid size-10 shrink-0 place-items-center rounded-xl"
+          aria-hidden="true"
+        >
+          <ng-icon [name]="option.icon" class="text-lg" />
+        </span>
+        <span class="min-w-0">
+          <span class="block font-medium">{{ option.title }}</span>
+          <span class="text-muted-foreground block text-sm leading-relaxed"
+            >{{ option.detail }}</span
+          >
+        </span>
+      </label>
+      }
+    </div>
+    } @case (1) {
+    <div #credentialStep>
+      <h2 id="step-heading" class="font-semibold">Which credentials the offer holds</h2>
+      <p class="text-muted-foreground mt-1 text-sm">
+        @if (flow() === 'authorization_code_iae') { Credentials with IAE steps, for the built-in
+        flow. } @else { Credentials without IAE steps. Those with IAE steps use the built-in flow. }
+      </p>
+      <div class="mt-5">
+        @if (!flowConfigs().length) {
+        <p class="bg-muted/60 flex gap-2.5 rounded-xl px-4 py-3 text-sm">
+          <ng-icon name="lucideInfo" class="mt-0.5 shrink-0" aria-hidden="true" />
+          <span>
+            @if (!allConfigs().length) { There are no credential configurations yet. @if
+            (managesConfigs()) {
+            <a routerLink="/credential-config/create" class="text-primary font-medium underline"
+              >Create one</a
+            >
+            to start. } @else { Ask someone with issuance:manage to create one. } } @else if (flow()
+            === 'authorization_code_iae') { No credential configuration has IAE steps, which this
+            flow needs. } @else { Every credential configuration has IAE steps. Choose the built-in
+            (IAE) flow instead. }
+          </span>
+        </p>
+        } @else {
+        <app-credential-picker
+          [configs]="flowConfigs()"
+          [selected]="selected()"
+          [invalid]="pickerInvalid()"
+          (selectedChange)="setSelected($event)"
+        />
+        @if (pickerInvalid()) {
+        <p class="text-destructive mt-2 text-sm" role="alert">Choose at least one credential.</p>
+        } }
+      </div>
+    </div>
+    } @case (2) {
+    <form #configStep [formGroup]="settings" class="grid gap-6" novalidate (ngSubmit)="create()">
+      @switch (flow()) { @case ('pre_authorized_code') {
+      <div>
+        <h2 id="step-heading" class="font-semibold">The claims of each credential</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          What the credentials say about the holder, and how the holder confirms the offer.
+        </p>
+      </div>
+
+      @if (serverOptions().length > 1) {
+      <hlm-field class="gap-2">
+        <label hlmFieldLabel for="offer-server">Authorization server</label>
+        <hlm-native-select
+          class="w-full"
+          selectClass="h-10"
+          selectId="offer-server"
+          formControlName="authorizationServer"
+        >
+          <option value="" disabled>Choose a server</option>
+          @for (server of serverOptions(); track server.value) {
+          <option [value]="server.value">{{ server.label }}</option>
+          }
+        </hlm-native-select>
+        <hlm-field-error validator="required">Choose an authorization server.</hlm-field-error>
+      </hlm-field>
+      }
+
+      <div class="grid gap-5 sm:grid-cols-2">
+        <hlm-field class="gap-2">
+          <label hlmFieldLabel for="offer-tx-code">
+            Transaction code <span class="text-muted-foreground font-normal">(optional)</span>
+          </label>
+          <input
+            hlmInput
+            id="offer-tx-code"
+            class="h-10 font-mono"
+            formControlName="txCode"
+            autocomplete="off"
+            inputmode="numeric"
+          />
+          <p hlmFieldDescription>A PIN the holder enters in the wallet to take the credential.</p>
+        </hlm-field>
+        @if (txCodeSet()) {
+        <hlm-field class="gap-2">
+          <label hlmFieldLabel for="offer-tx-description">
+            How to get the code <span class="text-muted-foreground font-normal">(optional)</span>
+          </label>
+          <input
+            hlmInput
+            id="offer-tx-description"
+            class="h-10"
+            formControlName="txCodeDescription"
+            placeholder="The PIN we sent to your email"
+          />
+          <p hlmFieldDescription>The wallet shows this beside the code field.</p>
+        </hlm-field>
+        }
+      </div>
+
+      <div class="grid gap-4">
+        @for (form of chosenForms(); track form.id) {
+        <app-claims-card [claimForm]="form" (sourceChange)="setSource(form, $event)" />
+        }
+      </div>
+      } @case ('authorization_code_external') {
+      <div>
+        <h2 id="step-heading" class="font-semibold">Who signs the holder in</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          The authorization server authenticates the holder; an attribute provider resolves each
+          credential's claims for them.
+        </p>
+      </div>
+      @if (!serverOptions().length) {
+      <p
+        class="border-destructive/30 bg-destructive/5 flex gap-2.5 rounded-xl border px-4 py-3 text-sm"
+      >
+        <ng-icon
+          name="lucideTriangleAlert"
+          class="text-destructive mt-0.5 shrink-0"
+          aria-hidden="true"
+        />
+        <span>
+          No authorization server is configured. Add an external, OID4VP or chained one in the
+          issuer settings.
+        </span>
+      </p>
+      } @else {
+      <hlm-field class="gap-2">
+        <label hlmFieldLabel for="offer-server">Authorization server</label>
+        <hlm-native-select
+          class="w-full"
+          selectClass="h-10"
+          selectId="offer-server"
+          formControlName="authorizationServer"
+        >
+          <option value="" disabled>Choose a server</option>
+          @for (server of serverOptions(); track server.value) {
+          <option [value]="server.value">{{ server.label }}</option>
+          }
+        </hlm-native-select>
+        <p hlmFieldDescription>In the order the issuer settings list them.</p>
+        <hlm-field-error validator="required">Choose an authorization server.</hlm-field-error>
+      </hlm-field>
+      <p class="bg-muted/60 flex gap-2.5 rounded-xl px-4 py-3 text-sm">
+        <ng-icon name="lucideInfo" class="mt-0.5 shrink-0" aria-hidden="true" />
+        <span>
+          @if (isChained(selectedServer())) { The chained server signs the holder in at the upstream
+          OpenID provider. } @else { The server signs the holder in. } The attribute provider then
+          receives the holder's identity (issuer and subject) and the token's claims to resolve the
+          credential's claims.
+        </span>
+      </p>
+      }
+      <ng-container
+        [ngTemplateOutlet]="providerChoices"
+        [ngTemplateOutletContext]="{ required: true }"
+      />
+      } @case ('authorization_code_iae') {
+      <div>
+        <h2 id="step-heading" class="font-semibold">Ready to offer</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          The built-in authorization server takes the holder through the IAE steps of each
+          credential.
+        </p>
+      </div>
+      <p class="border-success/30 bg-success/5 flex gap-2.5 rounded-xl border px-4 py-3 text-sm">
+        <ng-icon name="lucideCircleCheck" class="text-success mt-0.5 shrink-0" aria-hidden="true" />
+        <span>Nothing else is needed. An attribute provider per credential is optional.</span>
+      </p>
+      <ng-container
+        [ngTemplateOutlet]="providerChoices"
+        [ngTemplateOutletContext]="{ required: false }"
+      />
+      } }
+    </form>
+    } }
+
+    <!-- Back, Reset, then Next or Create: what each step can do, at its foot. -->
+    <div class="mt-7 flex flex-wrap items-center justify-between gap-3 border-t pt-5">
+      @if (step() > 0) {
+      <button hlmBtn variant="ghost" type="button" (click)="goTo($any(step() - 1))">
+        <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+        Back
+      </button>
+      } @else {
+      <span></span>
+      }
+      <div class="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+        @if (step() === 1 && credentialStepBlocked()) {
+        <span id="next-blocked" class="text-muted-foreground text-sm"
+          >{{ credentialStepBlocked() }}</span
+        >
+        } @if (step() === 2 && createBlocked()) {
+        <span id="create-blocked" class="text-muted-foreground text-sm">{{ createBlocked() }}</span>
+        } @if (step() === 2) {
+        <button hlmBtn variant="ghost" type="button" (click)="reset()">Reset</button>
+        <button
+          hlmBtn
+          type="button"
+          [attr.aria-disabled]="generating() || !!createBlocked() || null"
+          [attr.aria-describedby]="createBlocked() ? 'create-blocked' : null"
+          (click)="create()"
+        >
+          <ng-icon name="lucideQrCode" aria-hidden="true" />
+          {{ generating() ? 'Creating the offer…' : 'Create offer' }}
+        </button>
+        } @else {
+        <button
+          hlmBtn
+          type="button"
+          [attr.aria-disabled]="(step() === 1 && !!credentialStepBlocked()) || null"
+          [attr.aria-describedby]="step() === 1 && credentialStepBlocked() ? 'next-blocked' : null"
+          (click)="next()"
+        >
+          Next
+          <ng-icon name="lucideArrowRight" aria-hidden="true" />
+        </button>
+        }
+      </div>
+    </div>
+  </section>
+</div>
+}
+
+<!-- The attribute provider of each credential of an authorization code offer. -->
+<ng-template #providerChoices let-required="required">
+  <div class="grid gap-4">
+    <div>
+      <h3 class="flex items-center gap-2 text-sm font-semibold">
+        <ng-icon name="lucideCloudDownload" aria-hidden="true" />
+        Attribute providers @if (!required) {
+        <span class="text-muted-foreground font-normal">(optional)</span>
+        }
+      </h3>
+      <p class="text-muted-foreground mt-1 text-sm">
+        @if (required) { The service that resolves each credential's claims once the holder signed
+        in. } @else { Without one, the claims come from the credential configuration or the IAE
+        steps. }
+      </p>
+    </div>
+    @for (form of chosenForms(); track form.id) {
+    <hlm-field class="gap-2">
+      <label hlmFieldLabel [for]="'provider-' + form.id">
+        <span class="font-mono text-[0.8125rem]">{{ form.id }}</span>
+      </label>
+      <hlm-native-select
+        class="w-full"
+        selectClass="h-10"
+        [selectId]="'provider-' + form.id"
+        [formControl]="form.provider"
+      >
+        <option value="">{{ required ? 'Choose a provider' : 'None' }}</option>
+        @for (provider of providers(); track provider.id) {
+        <option [value]="provider.id">{{ provider.name }} ({{ provider.id }})</option>
+        }
+      </hlm-native-select>
+      @if (!providers().length) {
+      <p hlmFieldDescription>
+        {{ providersFailed() ? 'The attribute providers could not be loaded.' : 'No attribute
+        provider is configured yet.' }}
+      </p>
+      }
+      <hlm-field-error validator="required">
+        Choose the attribute provider that resolves the claims.
+      </hlm-field-error>
+    </hlm-field>
+    }
+  </div>
+</ng-template>

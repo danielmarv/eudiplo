@@ -1,0 +1,305 @@
+@if (tenant.isPending()) {
+<div role="status" aria-label="Loading the tenant" class="grid gap-6">
+  <hlm-skeleton class="h-44 w-full rounded-2xl" />
+  <div class="grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <hlm-skeleton class="h-80 rounded-2xl" />
+    <hlm-skeleton class="h-80 rounded-2xl" />
+  </div>
+  <div class="grid gap-6 md:grid-cols-2 2xl:grid-cols-3">
+    <hlm-skeleton class="h-48 rounded-2xl" />
+    <hlm-skeleton class="h-48 rounded-2xl" />
+    <hlm-skeleton class="h-48 rounded-2xl" />
+  </div>
+</div>
+} @else if (tenant.isError()) {
+<section
+  class="bg-card grid justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  @if (notFound(tenant.error())) {
+  <h1 class="text-lg font-semibold">There is no tenant {{ id() }}</h1>
+  <p class="text-muted-foreground max-w-md text-sm">
+    It may have been deleted, or the address has a typo.
+  </p>
+  <a hlmBtn variant="outline" routerLink="/tenants">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    All tenants
+  </a>
+  } @else {
+  <h1 class="text-lg font-semibold">The tenant could not be loaded</h1>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(tenant.error()) }}</p>
+  <div class="flex flex-wrap justify-center gap-2">
+    <button hlmBtn variant="outline" type="button" (click)="tenant.refetch()">Retry</button>
+    <a hlmBtn variant="ghost" routerLink="/tenants">All tenants</a>
+  </div>
+  }
+</section>
+} @else if (tenant.data(); as current) {
+<!-- Who the tenant is, in its colour (the same as its monogram everywhere) with the guilloche of an ID. -->
+<section [class]="surface(current.id)" aria-labelledby="tenant-heading">
+  <app-guilloche
+    class="absolute inset-y-0 inset-e-0 hidden w-[min(100%,36rem)] sm:block"
+    color="#ffffff"
+    [centerX]="0.78"
+    [centerY]="0.5"
+    [radius]="0.95"
+    [opacity]="0.28"
+  />
+  <div class="relative flex flex-wrap items-start justify-between gap-x-8 gap-y-5 p-5 sm:p-7">
+    <div class="flex min-w-0 items-start gap-4 sm:gap-5">
+      <span
+        class="grid size-14 shrink-0 place-items-center rounded-2xl bg-white/15 text-lg font-bold ring-1 ring-white/25 backdrop-blur-sm sm:size-16 sm:text-xl"
+        aria-hidden="true"
+        >{{ initials(current.name || current.id) }}</span
+      >
+      <div class="min-w-0">
+        <h1
+          id="tenant-heading"
+          class="text-[1.75rem] leading-tight font-bold break-words outline-none"
+          tabindex="-1"
+        >
+          {{ current.name || current.id }}
+        </h1>
+        @if (current.description) {
+        <p class="mt-1 max-w-prose leading-relaxed text-white/80">{{ current.description }}</p>
+        }
+        <ul class="mt-4 flex flex-wrap items-center gap-2 text-xs font-medium">
+          <li
+            class="inline-flex items-center gap-1 rounded-full bg-white/12 py-1 ps-3 pe-1 ring-1 ring-white/15 backdrop-blur-sm"
+          >
+            <span class="sr-only">Tenant ID</span>
+            <span class="font-mono">{{ current.id }}</span>
+            <button
+              type="button"
+              class="grid size-6 place-items-center rounded-full outline-none hover:bg-white/15 focus-visible:ring-2 focus-visible:ring-white/70"
+              aria-label="Copy tenant ID"
+              hlmTooltip="Copy tenant ID"
+              (click)="copyId(current.id)"
+            >
+              <ng-icon name="lucideCopy" class="text-[0.8rem]" />
+            </button>
+          </li>
+          <li
+            class="inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 ring-1 ring-white/15 backdrop-blur-sm"
+          >
+            @if (current.status === 'active') {
+            <span class="size-1.5 rounded-full bg-[#7ee08a]" aria-hidden="true"></span>
+            Active } @else {
+            <span class="size-1.5 rounded-full bg-[#ffc56b]" aria-hidden="true"></span>
+            Not set up }
+          </li>
+          <li
+            class="inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 ring-1 ring-white/15 backdrop-blur-sm"
+          >
+            <ng-icon name="lucideKeyRound" class="text-[0.8rem]" aria-hidden="true" />
+            {{ clients().length }} API {{ clients().length === 1 ? 'client' : 'clients' }}
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <a
+        hlmBtn
+        routerLink="edit"
+        class="bg-white text-[#1b2160] shadow-none hover:bg-white/90 focus-visible:ring-white/60"
+      >
+        <ng-icon name="lucidePencil" aria-hidden="true" />
+        Edit
+      </a>
+      <button
+        hlmBtn
+        type="button"
+        class="bg-white/12 text-white shadow-none ring-1 ring-white/25 hover:bg-[#c62828] focus-visible:ring-white/60"
+        (click)="toDelete.set(current)"
+      >
+        <ng-icon name="lucideTrash2" aria-hidden="true" />
+        Delete
+      </button>
+    </div>
+  </div>
+</section>
+
+@if (current.status !== 'active') {
+<div
+  class="border-warning/30 bg-warning/8 mt-6 flex gap-3 rounded-xl border px-4 py-3.5 text-sm"
+  role="note"
+>
+  <ng-icon name="lucideTriangleAlert" class="text-warning mt-0.5 shrink-0" aria-hidden="true" />
+  <div>
+    <p class="font-semibold">Setting up this tenant did not finish</p>
+    <p class="text-muted-foreground mt-0.5">
+      Creating its encryption key failed. The backend's log says why.
+    </p>
+  </div>
+</div>
+}
+
+<!--
+  On a wide screen what the clients can do runs down the right; on a narrower one it follows
+  the clients. The cards lay themselves out by the room they get.
+-->
+<div class="mt-6 grid items-start gap-6 2xl:grid-cols-[minmax(0,1fr)_22rem]">
+  <section
+    class="bg-card overflow-hidden rounded-2xl 2xl:col-start-1 2xl:row-start-1 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+    aria-labelledby="clients-heading"
+  >
+    <div class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4 sm:px-5">
+      <div>
+        <h2 id="clients-heading" class="font-semibold">API clients</h2>
+        <p class="text-muted-foreground text-sm">
+          They call the management API on this tenant's behalf.
+        </p>
+      </div>
+      @if (clients().length) {
+      <hlm-input-group class="h-9 w-full rounded-lg sm:max-w-64">
+        <hlm-input-group-addon>
+          <ng-icon name="lucideSearch" aria-hidden="true" />
+        </hlm-input-group-addon>
+        <input
+          hlmInputGroupInput
+          type="search"
+          aria-label="Search clients"
+          placeholder="Search clients or roles"
+          [value]="search()"
+          (input)="onSearch($event)"
+        />
+      </hlm-input-group>
+      }
+    </div>
+
+    @if (providerManagesClients() && clients().length) {
+    <p class="text-muted-foreground border-b px-4 py-3 text-sm sm:px-5">
+      The identity provider manages this tenant's clients. These records are left from an earlier
+      mode.
+    </p>
+    } @if (!clients().length) {
+    <div class="grid justify-items-center gap-3 px-6 py-12 text-center">
+      <span
+        class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl"
+        aria-hidden="true"
+      >
+        <ng-icon name="lucideKeyRound" class="text-xl" />
+      </span>
+      <p class="font-semibold">No API clients</p>
+      <p class="text-muted-foreground max-w-sm text-sm">
+        @if (providerManagesClients()) { The identity provider manages this tenant's clients. }
+        @else { A client of this tenant with clients:manage can add more under API clients. }
+      </p>
+    </div>
+    } @else if (!matching()) {
+    <div class="grid justify-items-center gap-3 px-6 py-12 text-center">
+      <p class="font-semibold">No client matches “{{ search() }}”</p>
+      <p class="text-muted-foreground text-sm">Search by client ID, description or role.</p>
+      <button hlmBtn variant="outline" type="button" (click)="showRole('')">
+        <ng-icon name="lucideX" aria-hidden="true" />
+        Clear search
+      </button>
+    </div>
+    } @else {
+    <div hlmTableContainer>
+      <table hlmTable class="table-fixed">
+        <thead hlmTHead class="bg-muted/40">
+          <tr hlmTr class="hover:bg-transparent">
+            <th
+              hlmTh
+              scope="col"
+              class="text-muted-foreground ps-4 pe-2 sm:ps-5 md:w-[30%]"
+              [attr.aria-sort]="ariaSort(column('clientId'))"
+            >
+              <app-sort-toggle [column]="column('clientId')">Client ID</app-sort-toggle>
+            </th>
+            <th hlmTh scope="col" class="text-muted-foreground hidden w-[28%] px-3 lg:table-cell">
+              Description
+            </th>
+            <th
+              hlmTh
+              scope="col"
+              class="text-muted-foreground px-3 pe-4 sm:pe-5"
+              [attr.aria-sort]="ariaSort(column('roles'))"
+            >
+              <app-sort-toggle [column]="column('roles')">Roles</app-sort-toggle>
+            </th>
+          </tr>
+        </thead>
+        <tbody hlmTBody>
+          @for (row of table.getRowModel().rows; track row.id) { @let client = row.original;
+          <tr hlmTr class="hover:bg-muted/40">
+            <td hlmTd class="py-3 ps-4 pe-2 align-top sm:ps-5">
+              <span class="block truncate font-mono text-[0.8125rem] font-medium"
+                >{{ client.clientId }}</span
+              >
+              <span class="text-muted-foreground block truncate text-xs lg:hidden"
+                >{{ client.description || 'No description' }}</span
+              >
+            </td>
+            <td hlmTd class="text-muted-foreground hidden px-3 py-3 align-top lg:table-cell">
+              <span class="block truncate" [title]="client.description ?? ''"
+                >{{ client.description || '–' }}</span
+              >
+            </td>
+            <td hlmTd class="px-3 py-3 pe-4 align-top whitespace-normal sm:pe-5">
+              <ul class="flex flex-wrap gap-1.5" [attr.aria-label]="'Roles of ' + client.clientId">
+                @for (role of rolesOf(client); track role) {
+                <li
+                  class="bg-primary/8 text-primary dark:bg-primary/15 rounded-md px-1.5 py-0.5 font-mono text-[0.7rem] font-medium"
+                  [class.ring-1]="search() === role"
+                  [class.ring-primary]="search() === role"
+                >
+                  {{ role }}
+                </li>
+                } @empty {
+                <li class="text-muted-foreground text-sm">No roles</li>
+                }
+              </ul>
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    <app-table-pagination [table]="table" singular="client" plural="clients" />
+    }
+  </section>
+
+  <app-role-coverage
+    class="2xl:sticky 2xl:top-20 2xl:col-start-2 2xl:row-span-2 2xl:row-start-1"
+    [clients]="clients()"
+    [selected]="search()"
+    (pick)="showRole($event)"
+  />
+
+  <div class="@container -mb-6 2xl:col-start-1 2xl:row-start-2">
+    <!-- Columns, not a grid: the short cards stack where the tall one stands alone. -->
+    <div class="columns-1 gap-6 @3xl:columns-2 @6xl:columns-3 [&>*]:mb-6 [&>*]:break-inside-avoid">
+      <app-settings-card
+        heading="Session data"
+        description="How long the data of an issuance or presentation is kept, and what happens then."
+        [settings]="settings().sessions"
+      />
+      <app-settings-card
+        heading="Default key chains"
+        description="Which key chains sign where a configuration names none."
+        allLabel="Chosen by EUDIPLO"
+        [settings]="settings().keyChains"
+      />
+      <app-settings-card
+        heading="Status lists"
+        description="How the revocation status of the credentials it issues is published."
+        [settings]="settings().statusLists"
+      />
+    </div>
+  </div>
+</div>
+
+<app-delete-tenant-dialog
+  [tenant]="toDelete()"
+  (closed)="toDelete.set(null)"
+  (deleted)="onDeleted($event)"
+/>
+}

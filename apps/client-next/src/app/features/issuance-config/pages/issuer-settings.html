@@ -1,0 +1,559 @@
+<app-ownership-notice class="mb-6 block empty:hidden" kind="IssuanceConfig" [resource]="owner()" />
+
+<app-page-header
+  heading="Issuer settings"
+  description="How wallets show your issuer, where they authorize, and what the issuer asks of them."
+>
+  @if (settings.isSuccess() && documents.canDownload('IssuanceConfig')) {
+  <button
+    hlmBtn
+    variant="outline"
+    size="icon"
+    type="button"
+    aria-label="Download configuration"
+    hlmTooltip="Download configuration"
+    [attr.aria-disabled]="downloading() || null"
+    [attr.aria-busy]="downloading() || null"
+    (click)="download()"
+  >
+    @if (downloading()) {
+    <hlm-spinner class="size-4" />
+    } @else {
+    <ng-icon name="lucideDownload" />
+    }
+  </button>
+  }
+  <a hlmBtn variant="ghost" routerLink="/credential-config/create">Add credential type</a>
+  @if (locked()) {
+  <span id="settings-locked" class="sr-only">{{ locked() }}</span>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    class="cursor-not-allowed opacity-50"
+    aria-disabled="true"
+    aria-describedby="settings-locked"
+    [hlmTooltip]="locked()"
+  >
+    <ng-icon name="lucideWandSparkles" aria-hidden="true" />
+    Use guided setup
+  </button>
+  <button
+    hlmBtn
+    type="button"
+    class="cursor-not-allowed opacity-50"
+    aria-disabled="true"
+    aria-describedby="settings-locked"
+    [hlmTooltip]="locked()"
+  >
+    <ng-icon name="lucideLock" aria-hidden="true" />
+    Edit
+  </button>
+  } @else {
+  <a hlmBtn variant="outline" routerLink="edit" [queryParams]="{ setup: true }">
+    <ng-icon name="lucideWandSparkles" aria-hidden="true" />
+    Use guided setup
+  </a>
+  <a hlmBtn routerLink="edit">
+    <ng-icon name="lucidePencil" aria-hidden="true" />
+    Edit
+  </a>
+  }
+</app-page-header>
+
+@if (settings.isPending()) {
+<div role="status" aria-label="Loading the issuer settings" class="grid gap-6">
+  <hlm-skeleton class="h-9 w-full max-w-xl rounded-lg" />
+  <div class="grid gap-6 lg:grid-cols-2">
+    <hlm-skeleton class="h-64 rounded-2xl" />
+    <hlm-skeleton class="h-64 rounded-2xl" />
+  </div>
+</div>
+} @else if (settings.isError()) {
+<section
+  class="bg-card grid justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  <p class="font-semibold">The issuer settings could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(settings.error()) }}</p>
+  <button hlmBtn variant="outline" type="button" (click)="settings.refetch()">Retry</button>
+</section>
+} @else if (settings.data(); as config) {
+<hlm-tabs [tab]="openTab()" (tabActivated)="selectTab($event)">
+  <div class="max-w-full overflow-x-auto border-b">
+    <hlm-tabs-list variant="line" aria-label="Issuer settings" class="h-11 justify-start">
+      <button hlmTabsTrigger="metadata" class="flex-none px-3">
+        <ng-icon name="lucideIdCard" aria-hidden="true" />
+        Metadata
+      </button>
+      <button hlmTabsTrigger="authorization" class="flex-none px-3">
+        <ng-icon name="lucideUserCheck" aria-hidden="true" />
+        Authorization
+        <span class="bg-foreground/6 rounded-full px-1.5 text-xs leading-5 tabular-nums"
+          >{{ servers().length }}</span
+        >
+      </button>
+      <button hlmTabsTrigger="security" class="flex-none px-3">
+        <ng-icon name="lucideShieldCheck" aria-hidden="true" />
+        Security
+      </button>
+      <button hlmTabsTrigger="certificate" class="flex-none px-3">
+        <ng-icon name="lucideFileBadge" aria-hidden="true" />
+        Registration certificate
+      </button>
+    </hlm-tabs-list>
+  </div>
+
+  <!-- Metadata: how wallets show the issuer, and the settings that apply to every request. -->
+  <div hlmTabsContent="metadata" class="pt-4">
+    <div class="grid items-start gap-6 lg:grid-cols-2">
+      <section
+        class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="preview-heading"
+      >
+        <h2 id="preview-heading" class="font-semibold">Shown to wallets</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          Wallets show this name and logo with the credentials you issue.
+        </p>
+        @if (display(); as shown) {
+        <div class="bg-muted/50 mt-5 flex items-center gap-4 rounded-xl p-4">
+          @if (shown.logo?.uri && failedLogo() !== shown.logo.uri) {
+          <img
+            [src]="shown.logo.uri"
+            [alt]="shown.logo.alt_text || 'Logo of ' + (shown.name || 'the issuer')"
+            class="size-14 shrink-0 rounded-xl bg-white object-contain p-1.5 ring-1 ring-black/5"
+            (error)="failedLogo.set(shown.logo.uri)"
+          />
+          } @else {
+          <span
+            class="bg-primary text-primary-foreground grid size-14 shrink-0 place-items-center rounded-xl text-lg font-bold"
+            aria-hidden="true"
+            >{{ initialsOf(shown.name || '?') }}</span
+          >
+          }
+          <div class="min-w-0">
+            <p class="truncate text-lg font-semibold">{{ shown.name || 'No name' }}</p>
+            @if (shown.locale) {
+            <p class="text-muted-foreground text-sm">
+              <span class="sr-only">Language: </span>{{ shown.locale }}
+            </p>
+            }
+          </div>
+        </div>
+        @if (config.display.length > 1) {
+        <h3 class="mt-5 flex items-center gap-2 text-sm font-medium">
+          <ng-icon name="lucideLanguages" class="text-muted-foreground" aria-hidden="true" />
+          In {{ config.display.length }} languages
+        </h3>
+        <ul class="mt-2 grid gap-1.5 text-sm">
+          @for (entry of config.display; track $index) {
+          <li class="flex min-w-0 items-baseline gap-3">
+            <span
+              class="bg-muted text-muted-foreground w-14 shrink-0 rounded px-1.5 py-0.5 text-center font-mono text-xs"
+              >{{ entry.locale || '–' }}</span
+            >
+            <span class="truncate">{{ entry.name || 'No name' }}</span>
+          </li>
+          }
+        </ul>
+        } } @else {
+        <p class="bg-muted/50 text-muted-foreground mt-5 rounded-xl p-4 text-sm">
+          Wallets show no name for this issuer. Add one with Edit.
+        </p>
+        }
+      </section>
+
+      <section
+        class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="details-heading"
+      >
+        <h2 id="details-heading" class="font-semibold">Details</h2>
+        <dl class="mt-4 divide-y text-sm">
+          <div class="flex items-start gap-3 py-3">
+            <ng-icon name="lucideClock" class="text-muted-foreground mt-0.5" aria-hidden="true" />
+            <dt class="text-muted-foreground w-40 shrink-0">Created</dt>
+            <dd class="min-w-0">
+              {{ dateTime(config.createdAt) }}
+              <span class="text-muted-foreground block text-xs"
+                >{{ relativeTime(config.createdAt) }}</span
+              >
+            </dd>
+          </div>
+          <div class="flex items-start gap-3 py-3">
+            <ng-icon
+              name="lucideCalendarClock"
+              class="text-muted-foreground mt-0.5"
+              aria-hidden="true"
+            />
+            <dt class="text-muted-foreground w-40 shrink-0">Last changed</dt>
+            <dd class="min-w-0">
+              {{ dateTime(config.updatedAt) }}
+              <span class="text-muted-foreground block text-xs"
+                >{{ relativeTime(config.updatedAt) }}</span
+              >
+            </dd>
+          </div>
+          <div class="flex items-start gap-3 py-3">
+            <ng-icon name="lucideLayers" class="text-muted-foreground mt-0.5" aria-hidden="true" />
+            <dt class="text-muted-foreground w-40 shrink-0">Batch size</dt>
+            <dd class="min-w-0">
+              {{ config.batchSize || 1 }} {{ (config.batchSize || 1) === 1 ? 'credential' :
+              'credentials' }} per request
+            </dd>
+          </div>
+          <div class="flex items-start gap-3 py-3">
+            <ng-icon
+              [name]="config.notificationEndpointEnabled === false ? 'lucideBellOff' : 'lucideBell'"
+              class="text-muted-foreground mt-0.5"
+              aria-hidden="true"
+            />
+            <dt class="text-muted-foreground w-40 shrink-0">Notification endpoint</dt>
+            <dd class="min-w-0">
+              {{ config.notificationEndpointEnabled === false ? 'Off' : 'On' }}
+            </dd>
+          </div>
+        </dl>
+      </section>
+    </div>
+  </div>
+
+  <!-- Authorization: the servers wallets get their access tokens from. -->
+  <div hlmTabsContent="authorization" class="pt-4">
+    <section
+      class="bg-card overflow-hidden rounded-2xl shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+      aria-labelledby="servers-heading"
+    >
+      <div class="border-b px-5 py-4 sm:px-6">
+        <h2 id="servers-heading" class="font-semibold">Authorization servers</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          Wallets get their access token from the default server: the first enabled one.
+        </p>
+      </div>
+      @if (!servers().length) {
+      <div class="flex gap-3 px-5 py-5 text-sm sm:px-6" role="note">
+        <ng-icon
+          name="lucideTriangleAlert"
+          class="text-warning mt-0.5 shrink-0"
+          aria-hidden="true"
+        />
+        <p>
+          <span class="font-semibold">No authorization servers.</span>
+          <span class="text-muted-foreground">
+            Add an external, OID4VP, chained or built-in authorization server before you use this
+            issuer.</span
+          >
+        </p>
+      </div>
+      } @else {
+      <ul class="divide-y">
+        @for (server of servers(); track $index) {
+        <li
+          class="grid gap-4 px-5 py-5 sm:px-6 xl:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] xl:gap-10"
+        >
+          <div class="flex min-w-0 gap-3">
+            <span
+              class="bg-accent text-accent-foreground grid size-9 shrink-0 place-items-center rounded-xl"
+              aria-hidden="true"
+            >
+              <ng-icon name="lucideServer" />
+            </span>
+            <div class="min-w-0">
+              <h3 class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span class="font-semibold break-all">{{ server.name }}</span>
+                @if (server.preferred) {
+                <span
+                  class="bg-primary/8 text-primary dark:bg-primary/15 rounded-md px-1.5 py-0.5 text-xs font-medium"
+                  >Default</span
+                >
+                } @if (!server.enabled) {
+                <span
+                  class="bg-muted text-muted-foreground rounded-md px-1.5 py-0.5 text-xs font-medium"
+                  >Disabled</span
+                >
+                }
+              </h3>
+              <p class="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-2 text-xs">
+                <span class="bg-muted rounded-md px-1.5 py-0.5 font-medium">
+                  {{ server.typeLabel }}
+                </span>
+                @if (server.id && server.id !== server.name) {
+                <span class="font-mono break-all">{{ server.id }}</span>
+                }
+              </p>
+              <p class="text-muted-foreground mt-2 text-sm">{{ server.summary }}</p>
+            </div>
+          </div>
+          <dl class="grid grid-cols-2 content-start gap-x-6 gap-y-3 text-sm lg:grid-cols-4">
+            @if (server.policy; as policy) {
+            <div>
+              <dt class="text-muted-foreground text-xs">DPoP</dt>
+              <dd class="mt-0.5 font-medium">{{ policy.dpop }}</dd>
+            </div>
+            <div>
+              <dt class="text-muted-foreground text-xs">Attestation status check</dt>
+              <dd class="mt-0.5 font-medium">
+                {{ policy.statusCheck }} @if (policy.statusCheckInherited) {
+                <span class="text-muted-foreground font-normal">(issuer default)</span>
+                }
+              </dd>
+            </div>
+            <div>
+              <dt class="text-muted-foreground text-xs">Access token</dt>
+              <dd class="mt-0.5 font-medium">
+                {{ policy.tokenLifetime }} @if (policy.tokenLifetimeIsDefault) {
+                <span class="text-muted-foreground font-normal">(default)</span>
+                }
+              </dd>
+            </div>
+            <div>
+              <dt class="text-muted-foreground text-xs">Refresh tokens</dt>
+              <dd class="mt-0.5 font-medium">{{ policy.refresh }}</dd>
+            </div>
+            } @for (detail of server.details; track detail.label) {
+            <div class="col-span-2">
+              <dt class="text-muted-foreground text-xs">{{ detail.label }}</dt>
+              <dd class="mt-0.5 font-mono text-[0.8rem] break-all">{{ detail.value }}</dd>
+            </div>
+            }
+          </dl>
+        </li>
+        }
+      </ul>
+      }
+    </section>
+  </div>
+
+  <!-- Security: what the issuer asks of wallets. -->
+  <div hlmTabsContent="security" class="pt-4">
+    <div class="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+      <section
+        class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="wallets-heading"
+      >
+        <h2 id="wallets-heading" class="font-semibold">Wallet requirements</h2>
+        <dl class="mt-2 divide-y text-sm">
+          <div class="flex gap-3 py-4">
+            <ng-icon
+              [name]="config.dPopRequired !== false ? 'lucideShieldCheck' : 'lucideShieldOff'"
+              class="text-muted-foreground mt-0.5 shrink-0"
+              aria-hidden="true"
+            />
+            <div class="min-w-0">
+              <dt class="font-medium">DPoP</dt>
+              <dd>{{ config.dPopRequired !== false ? 'Required' : 'Not required' }}</dd>
+              <dd class="text-muted-foreground mt-1">
+                Wallets bind their access tokens to a key they hold.
+              </dd>
+            </div>
+          </div>
+          <div class="flex gap-3 py-4">
+            <ng-icon
+              [name]="config.walletAttestationRequired ? 'lucideShieldCheck' : 'lucideShieldOff'"
+              class="text-muted-foreground mt-0.5 shrink-0"
+              aria-hidden="true"
+            />
+            <div class="min-w-0">
+              <dt class="font-medium">Wallet attestation</dt>
+              <dd>{{ config.walletAttestationRequired ? 'Required' : 'Not required' }}</dd>
+              <dd class="text-muted-foreground mt-1">
+                Wallets prove which wallet provider they come from.
+              </dd>
+            </div>
+          </div>
+          <div class="flex gap-3 py-4">
+            <ng-icon
+              name="lucideListChecks"
+              class="text-muted-foreground mt-0.5 shrink-0"
+              aria-hidden="true"
+            />
+            <div class="min-w-0">
+              <dt class="font-medium">Attestation status check</dt>
+              <dd>
+                {{ statusCheckModeLabel(config.walletAttestationStatusCheckMode) }} @if
+                (!config.walletAttestationStatusCheckMode) {
+                <span class="text-muted-foreground">(default)</span>
+                } @if (config.walletAttestationStatusCheckMode === 'disabled') {
+                <span class="text-muted-foreground">: revoked attestations are accepted</span>
+                }
+              </dd>
+              <dd class="text-muted-foreground mt-1">
+                Applies to key attestations at the credential endpoint, and to wallet attestations
+                unless an authorization server sets its own.
+              </dd>
+            </div>
+          </div>
+          @if (config.walletAttestationRequired) {
+          <div class="flex gap-3 py-4">
+            <ng-icon
+              name="lucideShieldCheck"
+              class="text-muted-foreground mt-0.5 shrink-0"
+              aria-hidden="true"
+            />
+            <div class="min-w-0">
+              <dt class="font-medium">Wallet provider trust lists</dt>
+              @if (config.walletProviderTrustLists?.length; as count) {
+              <dd>{{ count }} {{ count === 1 ? 'trust list' : 'trust lists' }}</dd>
+              } @else {
+              <dd class="text-warning flex items-center gap-1.5 font-medium">
+                <ng-icon name="lucideTriangleAlert" aria-hidden="true" />
+                None: every wallet is rejected
+              </dd>
+              }
+            </div>
+          </div>
+          }
+        </dl>
+      </section>
+
+      <section
+        class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="tx-code-heading"
+      >
+        <h2 id="tx-code-heading" class="font-semibold">Transaction codes</h2>
+        <dl class="mt-2 text-sm">
+          <div class="flex gap-3 py-4">
+            <ng-icon
+              name="lucideHash"
+              class="text-muted-foreground mt-0.5 shrink-0"
+              aria-hidden="true"
+            />
+            <div class="min-w-0">
+              <dt class="font-medium">Failed attempts allowed</dt>
+              <dd>
+                @if (config.txCodeMaxAttempts === null || config.txCodeMaxAttempts === undefined) {
+                {{ defaultTxCodeAttempts }} <span class="text-muted-foreground">(default)</span>
+                } @else { {{ config.txCodeMaxAttempts }} }
+              </dd>
+              <dd class="text-muted-foreground mt-1">
+                After this many wrong transaction codes, the offer's pre-authorized code no longer
+                works.
+              </dd>
+            </div>
+          </div>
+        </dl>
+      </section>
+    </div>
+  </div>
+
+  <!-- Registration certificate: the issuer's entry in the registrar, shown in its metadata. -->
+  <div hlmTabsContent="certificate" class="pt-4">
+    @if (certificate(); as certificate) {
+    <div class="grid items-start gap-6 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+      <section
+        class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="certificate-heading"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="certificate-heading" class="font-semibold">Registration certificate</h2>
+          <span
+            class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium {{ certificate.status.tone }}"
+            data-testid="certificate-status"
+          >
+            <ng-icon [name]="certificate.status.icon" aria-hidden="true" />
+            {{ certificate.status.label }}
+          </span>
+        </div>
+        @if (!certificate.config?.enabled) {
+        <p class="text-muted-foreground mt-3 text-sm">
+          The issuer's metadata carries no registration certificate. Turn it on with Edit.
+        </p>
+        } @else {
+        <dl class="mt-3 divide-y text-sm">
+          <div class="flex gap-3 py-3">
+            <dt class="text-muted-foreground w-28 shrink-0">Source</dt>
+            <dd>{{ certificate.generated ? 'Generated at the registrar' : 'Imported' }}</dd>
+          </div>
+          @if (certificate.generated) {
+          <div class="flex gap-3 py-3">
+            <dt class="text-muted-foreground w-28 shrink-0">Renewed</dt>
+            <dd>{{ certificate.renewal }}</dd>
+          </div>
+          } @if (certificate.cache?.issuedAt; as issuedAt) {
+          <div class="flex gap-3 py-3">
+            <dt class="text-muted-foreground w-28 shrink-0">Issued</dt>
+            <dd>{{ dateTime(issuedAt * 1000) }}</dd>
+          </div>
+          } @if (certificate.cache?.expiresAt; as expiresAt) {
+          <div class="flex gap-3 py-3">
+            <dt class="text-muted-foreground w-28 shrink-0">Expires</dt>
+            <dd>
+              {{ dateTime(expiresAt * 1000) }}
+              <span class="text-muted-foreground block text-xs">{{ fromNow(expiresAt) }}</span>
+            </dd>
+          </div>
+          }
+        </dl>
+        @if (certificate.generated) {
+        <button
+          hlmBtn
+          type="button"
+          class="mt-4"
+          [attr.aria-disabled]="reissue.isPending() || null"
+          (click)="regenerate()"
+        >
+          @if (reissue.isPending()) {
+          <hlm-spinner class="size-4" aria-hidden="true" />
+          Regenerating… } @else {
+          <ng-icon name="lucideRefreshCw" aria-hidden="true" />
+          Regenerate now }
+        </button>
+        <p class="text-muted-foreground mt-2 text-xs">
+          Requests a new certificate from the registrar and revokes the current one.
+        </p>
+        } }
+      </section>
+
+      <section
+        class="bg-card min-w-0 rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="jwt-heading"
+      >
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="jwt-heading" class="font-semibold">Certificate JWT</h2>
+          @if (certificate.jwt; as jwt) {
+          <button hlmBtn variant="outline" size="sm" type="button" (click)="copyJwt(jwt)">
+            <ng-icon name="lucideCopy" aria-hidden="true" />
+            Copy
+          </button>
+          }
+        </div>
+        @if (certificate.jwt; as jwt) {
+        <pre
+          class="bg-muted/60 mt-3 max-h-40 overflow-auto rounded-lg p-3 font-mono text-xs leading-relaxed break-all whitespace-pre-wrap"
+          aria-label="Certificate JWT"
+          tabindex="0"
+        >
+{{ jwt }}</pre>
+        <div class="mt-5 grid gap-4 2xl:grid-cols-2">
+          @for (part of certificate.decoded; track part.name) {
+          <div class="min-w-0">
+            <h3 class="text-sm font-medium">{{ part.name }}</h3>
+            @if (part.json; as json) {
+            <pre
+              class="bg-muted/60 mt-2 max-h-96 overflow-auto rounded-lg p-3 font-mono text-xs leading-relaxed"
+              [attr.aria-label]="'Decoded ' + part.name.toLowerCase()"
+              tabindex="0"
+            >
+{{ json }}</pre>
+            } @else {
+            <p class="text-destructive mt-2 text-sm">
+              Could not decode the {{ part.name.toLowerCase() }}: {{ part.error }}
+            </p>
+            }
+          </div>
+          }
+        </div>
+        } @else {
+        <p class="text-muted-foreground mt-3 text-sm">There is no registration certificate yet.</p>
+        }
+      </section>
+    </div>
+    }
+  </div>
+</hlm-tabs>
+}

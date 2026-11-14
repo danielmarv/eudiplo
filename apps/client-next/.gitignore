@@ -1,0 +1,14 @@
+# Compiled output
+/dist
+/tmp
+/out-tsc
+
+# Node
+/node_modules
+
+# Angular and test caches
+/.angular/cache
+/coverage
+
+# Written by scripts/write-dev-env.mjs; holds the local client secret.
+/.dev

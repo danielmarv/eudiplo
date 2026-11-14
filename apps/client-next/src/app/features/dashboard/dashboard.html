@@ -1,0 +1,433 @@
+<!-- minmax(0, 1fr) columns: long IDs truncate instead of widening the page. -->
+<div class="grid grid-cols-1 gap-8">
+  <app-welcome-hero [eyebrow]="today" [heading]="greeting()" [summary]="summary()">
+    <span
+      class="inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-xs font-medium ring-1 ring-white/15 backdrop-blur-sm"
+    >
+      @if (version.isError()) {
+      <span class="size-2 rounded-full bg-[#ff8a80]" aria-hidden="true"></span>
+      {{ instanceHost }}: not answering } @else {
+      <span
+        class="size-2 rounded-full"
+        [class]="version.isSuccess() ? 'bg-[#7ee08a]' : 'bg-white/50'"
+        aria-hidden="true"
+      ></span>
+      {{ instanceHost }} @if (versionLabel(); as label) {
+      <span class="text-white/60">{{ label }}</span>
+      } }
+    </span>
+    <span
+      class="inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-xs font-medium ring-1 ring-white/15 backdrop-blur-sm"
+    >
+      <ng-icon name="lucideBuilding2" aria-hidden="true" />
+      {{ tenantId() ?? 'All tenants' }}
+    </span>
+    @if (authMode(); as mode) {
+    <span
+      class="inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-xs font-medium ring-1 ring-white/15 backdrop-blur-sm"
+    >
+      <ng-icon name="lucideKeyRound" aria-hidden="true" />
+      {{ mode }}
+    </span>
+    }
+  </app-welcome-hero>
+
+  <!-- Where to go next, for the caller's roles. -->
+  <section aria-labelledby="actions-heading">
+    <h2 id="actions-heading" class="sr-only">Quick actions</h2>
+    <!-- As many columns as fit, so three actions fill the row as well as four. -->
+    <ul class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))] gap-4">
+      @for (action of quickActions(); track action.path) {
+      <li>
+        <a
+          [routerLink]="action.path"
+          class="group bg-card flex h-full items-start gap-4 rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 transition-[box-shadow,transform] hover:-translate-y-0.5 hover:shadow-[0_1px_2px_rgba(16,24,64,0.04),0_22px_44px_-22px_rgba(27,33,96,0.45)] dark:ring-white/8"
+        >
+          <span [class]="actionTile(action)" aria-hidden="true">
+            <ng-icon [name]="action.icon" class="text-xl" />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="flex items-center justify-between gap-2 font-semibold">
+              {{ action.title }}
+              <ng-icon
+                name="lucideArrowRight"
+                class="text-muted-foreground shrink-0 transition-transform group-hover:translate-x-0.5"
+                aria-hidden="true"
+              />
+            </span>
+            <span class="text-muted-foreground mt-1 block text-sm leading-snug">
+              {{ action.description }}
+            </span>
+          </span>
+        </a>
+      </li>
+      }
+    </ul>
+  </section>
+
+  <!-- The figures: sessions for a tenant, tenants and the instance for the operator. -->
+  <section aria-labelledby="figures-heading">
+    <h2 id="figures-heading" class="sr-only">Figures</h2>
+    <div class="grid grid-cols-[repeat(auto-fit,minmax(min(100%,14rem),1fr))] gap-4">
+      @if (readsSessions()) {
+      <app-stat-tile
+        label="Issuance sessions, 24 h"
+        icon="lucideIdCard"
+        tone="blue"
+        [value]="stats.data()?.issuance?.total ?? 0"
+        [parts]="sessionParts(stats.data()?.issuance)"
+        hint="No credentials offered in the last 24 hours."
+        [loading]="stats.isPending()"
+        [failed]="stats.isError()"
+      />
+      <app-stat-tile
+        label="Presentation sessions, 24 h"
+        icon="lucideScanLine"
+        tone="teal"
+        [value]="stats.data()?.presentation?.total ?? 0"
+        [parts]="sessionParts(stats.data()?.presentation)"
+        hint="No presentations requested in the last 24 hours."
+        [loading]="stats.isPending()"
+        [failed]="stats.isError()"
+      />
+      } @if (managesIssuance()) {
+      <app-stat-tile
+        label="Credential types"
+        icon="lucideTag"
+        tone="amber"
+        [value]="credentialConfigs.data()?.length"
+        hint="The credentials your issuer can offer."
+        [loading]="credentialConfigs.isPending()"
+        [failed]="credentialConfigs.isError()"
+      />
+      } @if (managesPresentation()) {
+      <app-stat-tile
+        label="Verification configs"
+        icon="lucideFileCheck"
+        tone="green"
+        [value]="presentationConfigs.data()?.length"
+        hint="The presentations you can ask wallets for."
+        [loading]="presentationConfigs.isPending()"
+        [failed]="presentationConfigs.isError()"
+      />
+      } @if (managesTenants()) {
+      <app-stat-tile
+        label="Tenants"
+        icon="lucideBuilding2"
+        tone="blue"
+        [value]="tenants.data()?.length"
+        [hint]="activeTenants() + ' active'"
+        [loading]="tenants.isPending()"
+        [failed]="tenants.isError()"
+      />
+      @if (clientCount() !== undefined) {
+      <app-stat-tile
+        label="API clients"
+        icon="lucideMonitorSmartphone"
+        tone="teal"
+        [value]="clientCount()"
+        hint="Across all tenants."
+      />
+      } } @if (!tenantId()) {
+      <app-stat-tile
+        label="Version"
+        icon="lucidePackage"
+        tone="amber"
+        [value]="version.data()?.version"
+        [hint]="version.data()?.revision ? 'Revision ' + version.data()?.revision : 'Of the backend you are signed in to.'"
+        [loading]="version.isPending()"
+        [failed]="version.isError()"
+      />
+      <app-stat-tile
+        label="Config import"
+        icon="lucideImport"
+        tone="green"
+        [value]="importMode()"
+        hint="How the backend applies configuration files at start-up."
+        [loading]="config.isPending()"
+        [failed]="config.isError()"
+      />
+      }
+    </div>
+  </section>
+
+  <!-- Activity: how the tenant's sessions went over the period chosen above the charts. -->
+  @if (readsSessions()) {
+  <section aria-labelledby="activity-heading" class="grid gap-4">
+    <div class="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      <div>
+        <h2 id="activity-heading" class="text-lg font-semibold">Activity</h2>
+        <p class="text-muted-foreground text-sm">{{ retentionNote() }}</p>
+      </div>
+      <div
+        class="bg-muted/70 inline-flex max-w-full overflow-x-auto rounded-lg p-0.5"
+        role="group"
+        aria-label="Period of the charts"
+      >
+        @for (range of activityRanges(); track range.value) {
+        <button
+          type="button"
+          class="text-muted-foreground hover:text-foreground aria-pressed:bg-card aria-pressed:text-foreground inline-flex h-8 shrink-0 items-center rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors disabled:pointer-events-none disabled:opacity-45 aria-pressed:shadow-[0_1px_2px_rgba(16,24,64,0.08)]"
+          [attr.aria-pressed]="activityRange() === range.value"
+          [disabled]="!range.available"
+          (click)="activityRange.set(range.value)"
+        >
+          {{ range.label }}
+        </button>
+        }
+      </div>
+    </div>
+
+    <div
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    >
+      @if (activity.isPending()) {
+      <hlm-skeleton class="h-5 w-40" />
+      <hlm-skeleton class="mt-2 h-4 w-56" />
+      <hlm-skeleton class="mt-4 h-[264px] w-full rounded-lg" />
+      } @else if (activity.isError()) {
+      <div class="grid justify-items-center gap-3 py-16 text-center" role="alert">
+        <p class="font-semibold">The activity could not be loaded</p>
+        <button hlmBtn variant="outline" size="sm" type="button" (click)="activity.refetch()">
+          Retry
+        </button>
+      </div>
+      } @else {
+      <app-activity-chart
+        [buckets]="activityBuckets()"
+        [range]="activityRange()"
+        [kinds]="activityKinds()"
+        [refreshing]="activityRefreshing()"
+      />
+      }
+    </div>
+
+    <div class="grid items-start gap-4 lg:grid-cols-2 xl:grid-cols-3">
+      @for (kind of activityKinds(); track kind) {
+      <app-session-outcomes
+        [kind]="kind"
+        [totals]="activityTotals()[kind]"
+        [loading]="activity.isPending()"
+        [refreshing]="activityRefreshing()"
+      />
+      }
+      <app-failure-reasons
+        [issuance]="activityTotals().issuance"
+        [presentation]="activityTotals().presentation"
+        [loading]="activity.isPending()"
+        [refreshing]="activityRefreshing()"
+      />
+    </div>
+  </section>
+  }
+
+  <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+    <!-- The main list: recent sessions for a tenant, the tenants for the operator. -->
+    @if (readsSessions()) {
+    <section
+      class="bg-card rounded-2xl shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+      aria-labelledby="sessions-heading"
+    >
+      <header class="flex items-center justify-between gap-4 px-6 pt-5 pb-3">
+        <div>
+          <h2 id="sessions-heading" class="text-lg font-semibold">Recent sessions</h2>
+          <p class="text-muted-foreground text-sm">Issuance and presentation, newest first.</p>
+        </div>
+        <a hlmBtn variant="ghost" size="sm" routerLink="/session-management">
+          View all
+          <ng-icon name="lucideArrowRight" aria-hidden="true" />
+        </a>
+      </header>
+      @if (recentSessions.isPending()) {
+      <div class="grid gap-3 px-6 pb-6">
+        @for (row of [1, 2, 3, 4]; track row) {
+        <hlm-skeleton class="h-14 w-full rounded-xl" />
+        }
+      </div>
+      } @else if (recentSessions.isError()) {
+      <p class="text-destructive px-6 pb-6 text-sm">The recent sessions could not be loaded.</p>
+      } @else {
+      <ul class="divide-border/70 divide-y px-2 pb-2">
+        @for (session of recentSessions.data()?.items ?? []; track session.id) {
+        <li>
+          <a
+            [routerLink]="['/session-management', session.id]"
+            class="hover:bg-muted/60 flex items-center gap-4 rounded-xl px-4 py-3 transition-colors"
+          >
+            <span
+              class="grid size-10 shrink-0 place-items-center rounded-xl"
+              [class]="isPresentation(session) ? 'bg-[#e6f6f3] text-[#0a7c70] dark:bg-[#0f8c7e]/20 dark:text-[#5fd3c3]' : 'bg-accent text-accent-foreground'"
+              aria-hidden="true"
+            >
+              <ng-icon
+                [name]="isPresentation(session) ? 'lucideScanLine' : 'lucideIdCard'"
+                class="text-lg"
+              />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm font-semibold">{{ sessionTitle(session) }}</span>
+              <span class="text-muted-foreground block text-xs">
+                {{ isPresentation(session) ? 'Presentation' : 'Issuance' }}
+                <span class="font-mono">{{ session.id.slice(0, 8) }}</span>
+              </span>
+            </span>
+            <span
+              class="hidden shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold sm:inline"
+              [class]="status(session).classes"
+              >{{ status(session).label }}</span
+            >
+            <span class="text-muted-foreground w-24 shrink-0 text-end text-xs">
+              {{ ago(session.createdAt) }}
+            </span>
+          </a>
+        </li>
+        } @empty {
+        <li class="grid justify-items-center gap-2 px-6 py-12 text-center">
+          <span
+            class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl"
+          >
+            <ng-icon name="lucideActivity" class="text-xl" aria-hidden="true" />
+          </span>
+          <p class="font-semibold">No sessions yet</p>
+          <p class="text-muted-foreground max-w-sm text-sm">
+            Issue a credential or request a presentation, and the sessions show up here.
+          </p>
+        </li>
+        }
+      </ul>
+      }
+    </section>
+    } @else if (managesTenants()) {
+    <section
+      class="bg-card rounded-2xl shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+      aria-labelledby="tenants-heading"
+    >
+      <header class="flex items-center justify-between gap-4 px-6 pt-5 pb-3">
+        <div>
+          <h2 id="tenants-heading" class="text-lg font-semibold">Tenants</h2>
+          <p class="text-muted-foreground text-sm">
+            Each with its own clients, keys and configuration.
+          </p>
+        </div>
+        <a hlmBtn variant="ghost" size="sm" routerLink="/tenants">
+          View all
+          <ng-icon name="lucideArrowRight" aria-hidden="true" />
+        </a>
+      </header>
+      @if (tenants.isPending()) {
+      <div class="grid gap-3 px-6 pb-6">
+        @for (row of [1, 2, 3]; track row) {
+        <hlm-skeleton class="h-14 w-full rounded-xl" />
+        }
+      </div>
+      } @else if (tenants.isError()) {
+      <p class="text-destructive px-6 pb-6 text-sm">The tenants could not be loaded.</p>
+      } @else {
+      <ul class="divide-border/70 divide-y px-2 pb-2">
+        @for (tenant of (tenants.data() ?? []).slice(0, 6); track tenant.id) {
+        <li>
+          <a
+            [routerLink]="['/tenants', tenant.id]"
+            class="hover:bg-muted/60 flex items-center gap-4 rounded-xl px-4 py-3 transition-colors"
+          >
+            <span [class]="avatar(tenant.id)" aria-hidden="true"
+              >{{ initials(tenant.name || tenant.id) }}</span
+            >
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-sm font-semibold">{{ tenant.name }}</span>
+              <span class="text-muted-foreground block truncate text-xs">
+                <span class="font-mono">{{ tenant.id }}</span>
+                @if (tenant.description) {
+                <span> – {{ tenant.description }}</span>
+                }
+              </span>
+            </span>
+            @if (tenant.clients) {
+            <span class="text-muted-foreground hidden shrink-0 text-xs sm:inline">
+              {{ tenant.clients.length }} {{ tenant.clients.length === 1 ? 'client' : 'clients' }}
+            </span>
+            }
+            <span
+              class="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold"
+              [class]="tenant.status === 'active' ? 'bg-success/12 text-success' : 'bg-muted text-muted-foreground'"
+              >{{ tenant.status === 'active' ? 'Active' : 'Not set up' }}</span
+            >
+          </a>
+        </li>
+        } @empty {
+        <li class="grid justify-items-center gap-3 px-6 py-12 text-center">
+          <span
+            class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl"
+          >
+            <ng-icon name="lucideBuilding2" class="text-xl" aria-hidden="true" />
+          </span>
+          <p class="font-semibold">No tenants yet</p>
+          <p class="text-muted-foreground max-w-sm text-sm">
+            A tenant is an organization that issues or verifies credentials, with its own clients
+            and keys.
+          </p>
+          <a hlmBtn routerLink="/tenants/create" class="mt-1">
+            <ng-icon name="lucidePlus" aria-hidden="true" />
+            Add a tenant
+          </a>
+        </li>
+        }
+      </ul>
+      }
+    </section>
+    }
+
+    <!-- The facts of this instance and of the caller. -->
+    <aside class="grid content-start gap-6" aria-label="Instance and access">
+      <section
+        class="bg-card rounded-2xl p-6 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+        aria-labelledby="instance-heading"
+      >
+        <h2 id="instance-heading" class="flex items-center gap-2 text-base font-semibold">
+          <ng-icon name="lucideGlobe" class="text-primary" aria-hidden="true" />
+          Instance
+        </h2>
+        <dl class="mt-4 grid gap-3.5 text-sm">
+          <div>
+            <dt class="text-muted-foreground text-xs">Signed in to</dt>
+            <dd class="font-mono text-[0.8rem] [overflow-wrap:anywhere]">{{ instanceUrl }}</dd>
+          </div>
+          @if (config.data()?.publicUrl; as publicUrl) {
+          <div>
+            <dt class="text-muted-foreground text-xs">Public URL, for wallets</dt>
+            <dd class="font-mono text-[0.8rem] [overflow-wrap:anywhere]">{{ publicUrl }}</dd>
+          </div>
+          }
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <dt class="text-muted-foreground text-xs">Version</dt>
+              <dd class="font-medium">{{ version.data()?.version ?? '–' }}</dd>
+            </div>
+            <div>
+              <dt class="text-muted-foreground text-xs">Sign-in</dt>
+              <dd class="font-medium">{{ authMode() ?? '–' }}</dd>
+            </div>
+          </div>
+        </dl>
+      </section>
+
+      <section
+        class="bg-card rounded-2xl p-6 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+        aria-labelledby="access-heading"
+      >
+        <h2 id="access-heading" class="flex items-center gap-2 text-base font-semibold">
+          <ng-icon name="lucideKeyRound" class="text-primary" aria-hidden="true" />
+          Your access
+        </h2>
+        <p class="text-muted-foreground mt-1 text-sm">What the backend resolved from your token.</p>
+        <div class="mt-4 flex flex-wrap gap-1.5">
+          @for (role of caller()?.roles ?? []; track role) {
+          <span hlmBadge variant="secondary" class="font-mono text-[0.7rem]">{{ role }}</span>
+          } @empty {
+          <span class="text-muted-foreground text-sm">No roles</span>
+          }
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
