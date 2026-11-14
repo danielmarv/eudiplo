@@ -35,6 +35,7 @@ apps/client-next/
         │   └── notify/      # notices (toasts)
         ├── layout/          # the shell: sidebar, header, navigation model
         ├── shared/          # reusable app components and helpers
+        │   ├── api-key-endpoint/ # form of endpoints called with an API key (attribute providers, webhooks)
         │   ├── brand/       # Diplo, the guilloche, monograms
         │   ├── clipboard/   # copy with a notice
         │   ├── config-ownership/ # file-managed locks, ownership notice, configuration download
@@ -42,6 +43,7 @@ apps/client-next/
         │   ├── format/      # durations, dates, relative times, JWT parts
         │   ├── forms/       # field-to-fix, focus helpers, controls of default-able settings
         │   ├── pages/       # page header, placeholder page
+        │   ├── sessions/    # what a session holds, such as the claims a wallet presented
         │   └── testing/     # helpers for specs
         └── features/        # one folder per feature
 ```

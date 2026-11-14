@@ -1,0 +1,198 @@
+<section
+  class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-7 dark:ring-white/8"
+  aria-label="Presentation request"
+>
+  <div class="grid gap-8 md:grid-cols-[auto_minmax(0,1fr)] md:items-start">
+    @if (dcApi()) {
+    <div
+      class="bg-primary/6 dark:bg-primary/12 text-primary grid size-60 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideSmartphone" class="text-7xl" />
+    </div>
+    } @else {
+    <figure class="grid justify-items-center gap-2">
+      <div class="grid size-60 place-items-center rounded-2xl bg-white p-3 ring-1 ring-black/10">
+        @if (qrCode(); as image) {
+        <img [src]="image" alt="QR code of the presentation request" class="size-full" />
+        } @else {
+        <hlm-skeleton class="size-full rounded-xl" />
+        }
+      </div>
+      <figcaption class="text-muted-foreground text-xs">Scan with a wallet</figcaption>
+    </figure>
+    }
+
+    <div class="grid min-w-0 grid-cols-1 gap-5">
+      <div role="status" class="flex items-start gap-3" data-testid="request-state">
+        <span
+          class="grid size-10 shrink-0 place-items-center rounded-full"
+          [class]="tone[state().tone]"
+          aria-hidden="true"
+        >
+          @switch (state().tone) { @case ('good') {
+          <ng-icon name="lucideCircleCheck" class="text-xl" />
+          } @case ('bad') {
+          <ng-icon name="lucideCircleX" class="text-xl" />
+          } @default {
+          <hlm-spinner class="size-5" />
+          } }
+        </span>
+        <div class="min-w-0">
+          <h2 class="text-lg font-semibold">{{ state().title }}</h2>
+          <p class="text-muted-foreground text-sm [overflow-wrap:anywhere]">{{ state().detail }}</p>
+        </div>
+      </div>
+
+      @if (dcApi()) {
+      <div class="grid justify-items-start gap-2">
+        @if (dcApiBlocked(); as blocked) {
+        <span id="dc-api-blocked" class="sr-only">{{ blocked }}</span>
+        <button
+          hlmBtn
+          size="lg"
+          type="button"
+          class="cursor-not-allowed opacity-50"
+          aria-disabled="true"
+          aria-describedby="dc-api-blocked"
+          [hlmTooltip]="blocked"
+        >
+          <ng-icon name="lucideSmartphone" aria-hidden="true" />
+          Ask the wallet on this device
+        </button>
+        @if (!dcApiAvailable) {
+        <p class="text-muted-foreground text-sm">{{ blocked }}</p>
+        } } @else {
+        <button
+          hlmBtn
+          size="lg"
+          type="button"
+          [attr.aria-disabled]="presenting() || null"
+          (click)="present()"
+        >
+          @if (presenting()) {
+          <hlm-spinner class="size-4" aria-hidden="true" />
+          Waiting for the wallet… } @else {
+          <ng-icon name="lucideSmartphone" aria-hidden="true" />
+          Ask the wallet on this device }
+        </button>
+        }
+      </div>
+      } @else {
+      <div class="grid grid-cols-1 gap-1.5">
+        <p class="text-muted-foreground text-xs">Request link</p>
+        <div class="flex items-center gap-2">
+          <code
+            class="bg-muted/60 min-w-0 flex-1 truncate rounded-lg px-3 py-2 font-mono text-[0.8125rem]"
+            [title]="offer().uri"
+            >{{ offer().uri }}</code
+          >
+          <button
+            hlmBtn
+            variant="outline"
+            size="icon"
+            type="button"
+            aria-label="Copy the request link"
+            (click)="copy()"
+          >
+            <ng-icon name="lucideCopy" />
+          </button>
+        </div>
+      </div>
+      }
+
+      <div class="flex flex-wrap gap-2">
+        @if (!dcApi()) {
+        <a hlmBtn variant="outline" [href]="offer().uri">
+          <ng-icon name="lucideExternalLink" aria-hidden="true" />
+          Open in a wallet on this device
+        </a>
+        }
+        <button hlmBtn variant="ghost" type="button" (click)="another.emit()">
+          <ng-icon name="lucideRotateCcw" aria-hidden="true" />
+          New request
+        </button>
+      </div>
+      <p class="text-muted-foreground font-mono text-xs">Session {{ offer().session }}</p>
+    </div>
+  </div>
+</section>
+
+@if (results().length) {
+<section
+  class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+  aria-labelledby="results-heading"
+>
+  <h2 id="results-heading" class="font-semibold">Verification</h2>
+  <ul class="mt-4 grid gap-3" aria-label="Result per credential">
+    @for (result of results(); track $index) {
+    <li class="flex items-start gap-3 rounded-xl border px-4 py-3">
+      <ng-icon
+        [name]="result.verified ? 'lucideBadgeCheck' : 'lucideShieldAlert'"
+        class="mt-0.5 shrink-0 text-lg"
+        [class.text-success]="result.verified"
+        [class.text-destructive]="!result.verified"
+        aria-hidden="true"
+      />
+      <div class="min-w-0 text-sm">
+        <p class="font-medium">
+          {{ result.id || 'Credential ' + ($index + 1) }}
+          <span class="sr-only">{{ result.verified ? 'verified' : 'not verified' }}</span>
+          @if (result.format || result.docType) {
+          <span class="text-muted-foreground ms-1 text-xs font-normal"
+            >{{ result.docType || result.format }}</span
+          >
+          }
+        </p>
+        @if (result.message || result.error) {
+        <p class="text-muted-foreground mt-0.5 [overflow-wrap:anywhere]">
+          {{ result.message || result.error }}
+        </p>
+        } @for (warning of result.warnings; track $index) {
+        <p class="text-warning mt-1 flex items-start gap-1.5">
+          <ng-icon name="lucideTriangleAlert" class="mt-0.5 shrink-0" aria-hidden="true" />
+          {{ warning.message || warning.code }}
+        </p>
+        }
+      </div>
+    </li>
+    }
+  </ul>
+</section>
+} @if (presented().length) {
+<section
+  class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+  aria-labelledby="presented-heading"
+>
+  <h2 id="presented-heading" class="font-semibold">What the wallet shared</h2>
+  <div class="mt-4 grid gap-5 xl:grid-cols-2">
+    @for (credential of presented(); track $index) {
+    <section class="min-w-0 rounded-xl border" [attr.aria-label]="credential.queryId">
+      <header class="bg-muted/40 border-b px-4 py-2.5">
+        <h3 class="text-sm font-semibold">{{ credential.queryId }}</h3>
+        @if (credential.type || credential.issuer) {
+        <p class="text-muted-foreground truncate text-xs">
+          {{ credential.type }}@if (credential.type && credential.issuer) {, }@if
+          (credential.issuer) {issued by {{ credential.issuer }}}
+        </p>
+        }
+      </header>
+      @if (credential.claims.length) {
+      <dl class="divide-y text-sm">
+        @for (claim of credential.claims; track claim.path) {
+        <div class="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-3 px-4 py-2">
+          <dt class="text-muted-foreground font-mono text-xs leading-5 break-all">
+            {{ claim.path }}
+          </dt>
+          <dd class="break-words">{{ claim.value }}</dd>
+        </div>
+        }
+      </dl>
+      } @else {
+      <p class="text-muted-foreground px-4 py-3 text-sm">No claims besides the metadata.</p>
+      }
+    </section>
+    }
+  </div>
+</section>
+}

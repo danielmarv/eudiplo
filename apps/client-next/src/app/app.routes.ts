@@ -78,10 +78,24 @@ export const routes: Routes = [
       },
       // The current Web Client has the settings at both addresses.
       { path: 'status-list-config', pathMatch: 'full', redirectTo: 'status-lists/config' },
-      pending('attribute-providers', 'Attribute providers', ['issuance:manage']),
+      {
+        path: 'attribute-providers',
+        title: 'Attribute providers',
+        canActivate: [requireRole('issuance:manage')],
+        loadChildren: () =>
+          import('./features/attribute-providers/attribute-providers.routes').then(
+            (m) => m.ATTRIBUTE_PROVIDER_ROUTES
+          ),
+      },
 
       // Verification
-      pending('offer/presentation', 'New verification', ['presentation:request']),
+      {
+        path: 'offer/presentation',
+        title: 'New verification',
+        canActivate: [requireRole('presentation:request')],
+        loadChildren: () =>
+          import('./features/verification/verification.routes').then((m) => m.VERIFICATION_ROUTES),
+      },
       pending('presentation-config', 'Verification configs', ['presentation:manage']),
 
       // Sessions: the list checks its roles itself, the settings need a manage role.

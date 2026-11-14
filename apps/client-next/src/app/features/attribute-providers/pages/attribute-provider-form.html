@@ -1,0 +1,132 @@
+@if (editing()) {
+<app-ownership-notice
+  class="mb-6 block empty:hidden"
+  kind="AttributeProvider"
+  [resource]="owner()"
+/>
+}
+
+<app-page-header
+  [heading]="editing() ? 'Edit attribute provider' : 'Add attribute provider'"
+  description="A service of yours that EUDIPLO asks for a credential's claims while the wallet fetches it."
+>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    [attr.aria-disabled]="(editing() && !provider.isSuccess()) || null"
+    (click)="!(editing() && !provider.isSuccess()) && openJson()"
+  >
+    <ng-icon name="lucideCode" aria-hidden="true" />
+    Edit as JSON
+  </button>
+</app-page-header>
+
+@if (editing() && provider.isPending()) {
+<div role="status" aria-label="Loading the attribute provider" class="grid max-w-4xl gap-6">
+  <hlm-skeleton class="h-80 w-full rounded-2xl" />
+  <hlm-skeleton class="h-48 w-full rounded-2xl" />
+</div>
+} @else if (editing() && provider.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  @if (notFound(provider.error())) {
+  <p class="font-semibold">There is no attribute provider {{ id() }}</p>
+  } @else {
+  <p class="font-semibold">The attribute provider could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(provider.error()) }}</p>
+  <p class="text-muted-foreground text-sm">It can only be edited once it has loaded.</p>
+  }
+  <div class="flex flex-wrap justify-center gap-2">
+    @if (!notFound(provider.error())) {
+    <button hlmBtn variant="outline" type="button" (click)="provider.refetch()">Retry</button>
+    }
+    <a hlmBtn variant="ghost" routerLink="/attribute-providers">
+      <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+      All attribute providers
+    </a>
+  </div>
+</section>
+} @else {
+<form #formElement class="grid max-w-4xl gap-6" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <fieldset [disabled]="!!locked()" class="disabled:opacity-60">
+    <legend class="sr-only">Attribute provider</legend>
+    <app-endpoint-fields
+      [form]="form"
+      [editing]="editing()"
+      namePlaceholder="Member database"
+      urlHint="EUDIPLO posts the session and the requested credential to the URL, and issues the claims it answers with."
+      (nameInput)="onNameInput()"
+      (idInput)="onIdInput()"
+    />
+  </fieldset>
+
+  <div class="flex flex-wrap justify-end gap-2">
+    <a
+      hlmBtn
+      variant="ghost"
+      [routerLink]="editing() ? ['/attribute-providers', id()] : '/attribute-providers'"
+      >Cancel</a
+    >
+    @if (locked()) {
+    <span id="provider-locked" class="sr-only">{{ locked() }}</span>
+    <button
+      hlmBtn
+      type="button"
+      class="cursor-not-allowed opacity-50"
+      aria-disabled="true"
+      aria-describedby="provider-locked"
+      [hlmTooltip]="locked()"
+    >
+      <ng-icon name="lucideLock" aria-hidden="true" />
+      Save changes
+    </button>
+    } @else {
+    <button hlmBtn type="submit" [attr.aria-disabled]="saving() || null">
+      @if (saving()) {
+      <hlm-spinner class="size-4" aria-hidden="true" />
+      {{ editing() ? 'Saving…' : 'Adding…' }} } @else { {{ editing() ? 'Save changes' : 'Add
+      attribute provider' }} }
+    </button>
+    }
+  </div>
+</form>
+}
+
+<hlm-dialog [state]="jsonOpen() ? 'open' : 'closed'" (stateChanged)="onJsonState($event)">
+  <hlm-dialog-content *hlmDialogPortal="let ctx" class="sm:max-w-2xl">
+    <hlm-dialog-header>
+      <h2 hlmDialogTitle>Attribute provider as JSON</h2>
+      <p hlmDialogDescription>
+        As the API takes it. A stored key shows as <code class="font-mono">&lt;redacted&gt;</code>;
+        leave it so to keep the key.
+      </p>
+    </hlm-dialog-header>
+    <label class="sr-only" for="provider-json">Attribute provider as JSON</label>
+    <textarea
+      hlmTextarea
+      id="provider-json"
+      class="min-h-72 font-mono text-[0.8125rem]"
+      spellcheck="false"
+      [value]="json()"
+      [attr.aria-invalid]="!!jsonError() || null"
+      [attr.aria-describedby]="jsonError() ? 'provider-json-error' : null"
+      (input)="json.set($any($event.target).value); jsonError.set('')"
+    ></textarea>
+    @if (jsonError()) {
+    <p id="provider-json-error" class="text-destructive text-sm" role="alert">{{ jsonError() }}</p>
+    }
+    <hlm-dialog-footer>
+      <button hlmBtn variant="ghost" type="button" (click)="jsonOpen.set(false)">Cancel</button>
+      <button hlmBtn type="button" (click)="applyJson()">Use this JSON</button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>

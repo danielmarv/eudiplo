@@ -1,0 +1,321 @@
+<app-page-header
+  heading="New verification"
+  description="Ask a wallet to present credentials: choose what to ask for and how the wallet gets the request."
+/>
+
+@if (created(); as result) {
+<app-verification-result
+  class="max-w-4xl"
+  [offer]="result.offer"
+  [dcApi]="result.dcApi"
+  (another)="reset()"
+/>
+} @else if (configs.isPending()) {
+<div
+  class="grid max-w-4xl gap-6"
+  role="status"
+  aria-label="Loading the presentation configurations"
+>
+  <hlm-skeleton class="h-72 w-full rounded-2xl" />
+  <hlm-skeleton class="h-56 w-full rounded-2xl" />
+</div>
+} @else if (configs.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-14 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  <p class="font-semibold">The presentation configurations could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ loadError() }}</p>
+  <button hlmBtn variant="outline" type="button" (click)="configs.refetch()">Retry</button>
+</section>
+} @else if (!configs.data()?.length) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-14 text-center ring-1 ring-black/5 dark:ring-white/8"
+>
+  <span
+    class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideScanLine" class="text-xl" />
+  </span>
+  <p class="font-semibold">No presentation configurations yet</p>
+  <p class="text-muted-foreground max-w-sm text-sm">
+    A presentation configuration says which credentials and claims to ask a wallet for.
+  </p>
+  @if (managesConfigs()) {
+  <a hlmBtn routerLink="/presentation-config/create">
+    <ng-icon name="lucidePlus" aria-hidden="true" />
+    Create a presentation configuration
+  </a>
+  } @else {
+  <p class="text-muted-foreground text-sm">
+    Ask someone with the presentation:manage role to create one.
+  </p>
+  }
+</section>
+} @else {
+<div class="grid max-w-4xl gap-6">
+  <!-- What to ask for -->
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="what-heading"
+  >
+    <h2 id="what-heading" class="font-semibold">What to ask for</h2>
+    <p class="text-muted-foreground mt-1 mb-4 text-sm">
+      The presentation configuration names the credentials and claims the wallet is asked for.
+    </p>
+    @if ((configs.data()?.length ?? 0) > 6) {
+    <hlm-input-group class="mb-3 h-10 rounded-lg">
+      <hlm-input-group-addon>
+        <ng-icon name="lucideSearch" aria-hidden="true" />
+      </hlm-input-group-addon>
+      <input
+        hlmInputGroupInput
+        type="search"
+        aria-label="Search presentation configurations"
+        placeholder="Search by ID or description"
+        [value]="search()"
+        (input)="onSearch($event)"
+      />
+    </hlm-input-group>
+    }
+    <div
+      class="max-h-[28rem] divide-y overflow-y-auto rounded-xl border"
+      role="radiogroup"
+      aria-labelledby="what-heading"
+    >
+      @for (config of visible(); track config.id) { @let credentials = requestedCredentials(config);
+      <label
+        class="hover:bg-muted/50 has-checked:bg-primary/5 flex cursor-pointer items-start gap-3 px-4 py-3 transition-colors"
+      >
+        <input
+          type="radio"
+          name="presentation-config"
+          class="accent-primary mt-1"
+          [value]="config.id"
+          [checked]="selectedId() === config.id"
+          (change)="choose(config.id)"
+        />
+        <span class="min-w-0 flex-1">
+          <span class="font-mono text-sm font-medium break-all">{{ config.id }}</span>
+          @if (config.description) {
+          <span class="text-muted-foreground block text-sm">{{ config.description }}</span>
+          } @if (credentials.length) {
+          <span class="mt-1.5 flex flex-wrap gap-1.5">
+            @for (credential of credentials; track $index) {
+            <span
+              class="bg-muted inline-flex max-w-full items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs"
+              [title]="credential.type || ''"
+            >
+              <ng-icon
+                name="lucideIdCard"
+                class="text-muted-foreground shrink-0"
+                aria-hidden="true"
+              />
+              <span class="truncate">{{ credential.type || credential.id }}</span>
+              @if (credential.claims) {
+              <span class="text-muted-foreground shrink-0"
+                >{{ credential.claims }} {{ credential.claims === 1 ? 'claim' : 'claims' }}</span
+              >
+              }
+            </span>
+            }
+          </span>
+          }
+        </span>
+      </label>
+      } @empty {
+      <p class="text-muted-foreground px-4 py-6 text-center text-sm">
+        No presentation configuration matches “{{ search() }}”.
+      </p>
+      }
+    </div>
+
+    <div aria-live="polite">
+      @if (selected() && readiness() === undefined) {
+      <p class="text-muted-foreground mt-3 flex items-center gap-2 text-sm">
+        <hlm-spinner class="size-4" aria-hidden="true" />
+        Checking the access certificate…
+      </p>
+      } @else if (readiness(); as readiness) { @if (!readiness.ready) {
+      <div
+        class="border-destructive/30 bg-destructive/5 mt-3 flex gap-2.5 rounded-xl border px-4 py-3 text-sm"
+        data-testid="readiness"
+      >
+        <ng-icon
+          name="lucideCircleAlert"
+          class="text-destructive mt-0.5 shrink-0"
+          aria-hidden="true"
+        />
+        <p>{{ readiness.reason }}</p>
+      </div>
+      } }
+    </div>
+  </section>
+
+  <!-- How the wallet gets it -->
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="how-heading"
+  >
+    <h2 id="how-heading" class="font-semibold">How the wallet gets the request</h2>
+    <div class="mt-4 grid gap-3 sm:grid-cols-2" role="radiogroup" aria-labelledby="how-heading">
+      <label
+        class="has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-ring/50 flex cursor-pointer items-start gap-3 rounded-xl border p-4 has-focus-visible:ring-3"
+      >
+        <input
+          type="radio"
+          name="channel"
+          class="accent-primary mt-1"
+          [checked]="!dcApi()"
+          (change)="dcApi.set(false)"
+        />
+        <span>
+          <span class="flex items-center gap-2 text-sm font-medium">
+            <ng-icon name="lucideQrCode" class="text-muted-foreground" aria-hidden="true" />
+            QR code or link
+          </span>
+          <span class="text-muted-foreground mt-0.5 block text-sm"
+            >A wallet on any device scans the code or opens the link.</span
+          >
+        </span>
+      </label>
+      <label
+        class="has-checked:border-primary has-checked:bg-primary/5 has-focus-visible:ring-ring/50 flex cursor-pointer items-start gap-3 rounded-xl border p-4 has-focus-visible:ring-3"
+      >
+        <input
+          type="radio"
+          name="channel"
+          class="accent-primary mt-1"
+          [checked]="dcApi()"
+          (change)="dcApi.set(true)"
+        />
+        <span>
+          <span class="flex items-center gap-2 text-sm font-medium">
+            <ng-icon name="lucideSmartphone" class="text-muted-foreground" aria-hidden="true" />
+            Digital Credentials API
+          </span>
+          <span class="text-muted-foreground mt-0.5 block text-sm"
+            >The browser asks a wallet on this device, from this page.</span
+          >
+        </span>
+      </label>
+    </div>
+
+    @if (originProblem(); as problem) {
+    <div
+      class="border-destructive/30 bg-destructive/5 mt-3 flex gap-2.5 rounded-xl border px-4 py-3 text-sm"
+      role="status"
+      data-testid="origin-problem"
+    >
+      <ng-icon
+        name="lucideCircleAlert"
+        class="text-destructive mt-0.5 shrink-0"
+        aria-hidden="true"
+      />
+      <div>
+        <p>{{ problem }}</p>
+        @if (managesConfigs()) {
+        <p class="text-muted-foreground mt-1">
+          Add it to the configuration's allowed origins, or to the source file of a configuration
+          that a file provisioned.
+          <a
+            class="text-primary hover:underline"
+            [routerLink]="['/presentation-config', selectedId(), 'edit']"
+            >Edit the configuration</a
+          >
+        </p>
+        } @else {
+        <p class="text-muted-foreground mt-1">
+          Ask someone with the presentation:manage role to add it.
+        </p>
+        }
+      </div>
+    </div>
+    }
+
+    <div class="mt-6 grid gap-2 md:max-w-md">
+      <label class="text-sm font-medium" for="client-id-scheme"
+        >The wallet identifies the verifier by</label
+      >
+      <hlm-native-select
+        class="w-full"
+        selectClass="h-10"
+        selectId="client-id-scheme"
+        [value]="clientIdScheme()"
+        (valueChange)="clientIdScheme.set($any($event))"
+      >
+        @for (scheme of clientIdSchemes; track scheme.value) {
+        <option [value]="scheme.value">{{ scheme.label }} ({{ scheme.value }})</option>
+        }
+      </hlm-native-select>
+      <p class="text-muted-foreground text-sm">{{ schemeHint() }}</p>
+    </div>
+
+    <div class="mt-6 grid gap-3">
+      <div class="flex items-center gap-3">
+        <hlm-switch
+          inputId="override-transaction-data"
+          [checked]="overrideTransactionData()"
+          (checkedChange)="setOverride($event)"
+          aria-describedby="transaction-data-hint"
+        />
+        <label class="text-sm font-medium" for="override-transaction-data"
+          >Replace the transaction data</label
+        >
+      </div>
+      <p id="transaction-data-hint" class="text-muted-foreground -mt-1 text-sm">
+        Transaction data asks the wallet to confirm something, such as a payment, with the
+        presentation. Without it, the configuration's applies.
+      </p>
+      @if (overrideTransactionData()) {
+      <label class="sr-only" for="transaction-data">Transaction data as JSON</label>
+      <textarea
+        hlmTextarea
+        id="transaction-data"
+        class="min-h-40 font-mono text-[0.8125rem]"
+        spellcheck="false"
+        placeholder='[{ "type": "payment", "credential_ids": ["pid"] }]'
+        [value]="transactionData()"
+        [attr.aria-invalid]="!!transactionDataError() || null"
+        [attr.aria-describedby]="transactionDataError() ? 'transaction-data-error' : null"
+        (input)="transactionData.set($any($event.target).value); transactionDataError.set('')"
+      ></textarea>
+      @if (transactionDataError()) {
+      <p id="transaction-data-error" class="text-destructive text-sm" role="alert">
+        {{ transactionDataError() }}
+      </p>
+      } }
+    </div>
+  </section>
+
+  <div class="flex flex-wrap justify-end gap-2">
+    @if (blocked() && !creating()) {
+    <span id="create-blocked" class="sr-only">{{ blocked() }}</span>
+    <button
+      hlmBtn
+      type="button"
+      class="cursor-not-allowed opacity-50"
+      aria-disabled="true"
+      aria-describedby="create-blocked"
+      [hlmTooltip]="blocked()"
+      (click)="create()"
+    >
+      Create request
+    </button>
+    } @else {
+    <button hlmBtn type="button" [attr.aria-disabled]="creating() || null" (click)="create()">
+      @if (creating()) {
+      <hlm-spinner class="size-4" aria-hidden="true" />
+      Creating… } @else { Create request }
+    </button>
+    }
+  </div>
+</div>
+}

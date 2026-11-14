@@ -1,0 +1,239 @@
+<app-ownership-notice
+  class="mb-6 block empty:hidden"
+  kind="AttributeProvider"
+  [resource]="owner()"
+/>
+
+@if (provider.isPending()) {
+<div role="status" aria-label="Loading the attribute provider" class="grid gap-6">
+  <hlm-skeleton class="h-10 w-72 rounded-lg" />
+  <div class="grid gap-6 lg:grid-cols-2">
+    <hlm-skeleton class="h-48 rounded-2xl" />
+    <hlm-skeleton class="h-48 rounded-2xl" />
+  </div>
+</div>
+} @else if (provider.isError()) {
+<section
+  class="bg-card grid justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  @if (notFound(provider.error())) {
+  <h1 class="text-lg font-semibold">There is no attribute provider {{ id() }}</h1>
+  <p class="text-muted-foreground max-w-md text-sm">
+    It may have been deleted, or the address has a typo.
+  </p>
+  <a hlmBtn variant="outline" routerLink="/attribute-providers">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    All attribute providers
+  </a>
+  } @else {
+  <h1 class="text-lg font-semibold">The attribute provider could not be loaded</h1>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(provider.error()) }}</p>
+  <div class="flex flex-wrap justify-center gap-2">
+    <button hlmBtn variant="outline" type="button" (click)="provider.refetch()">Retry</button>
+    <a hlmBtn variant="ghost" routerLink="/attribute-providers">All attribute providers</a>
+  </div>
+  }
+</section>
+} @else if (provider.data(); as current) {
+<app-page-header [heading]="current.name || current.id" [description]="current.description || ''">
+  @if (documents.canDownload('AttributeProvider')) {
+  <button
+    hlmBtn
+    variant="outline"
+    size="icon"
+    type="button"
+    aria-label="Download configuration"
+    hlmTooltip="Download configuration"
+    [attr.aria-disabled]="downloading() || null"
+    [attr.aria-busy]="downloading() || null"
+    (click)="download()"
+  >
+    @if (downloading()) {
+    <hlm-spinner class="size-4" />
+    } @else {
+    <ng-icon name="lucideDownload" />
+    }
+  </button>
+  } @if (locked()) {
+  <span id="provider-locked" class="sr-only">{{ locked() }}</span>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    class="cursor-not-allowed opacity-50"
+    aria-disabled="true"
+    aria-describedby="provider-locked"
+    [hlmTooltip]="locked()"
+  >
+    <ng-icon name="lucideTrash2" aria-hidden="true" />
+    Delete
+  </button>
+  <button
+    hlmBtn
+    type="button"
+    class="cursor-not-allowed opacity-50"
+    aria-disabled="true"
+    aria-describedby="provider-locked"
+    [hlmTooltip]="locked()"
+  >
+    <ng-icon name="lucideLock" aria-hidden="true" />
+    Edit
+  </button>
+  } @else {
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    class="hover:border-destructive/40 hover:text-destructive"
+    (click)="toDelete.set(current)"
+  >
+    <ng-icon name="lucideTrash2" aria-hidden="true" />
+    Delete
+  </button>
+  <a hlmBtn routerLink="edit">
+    <ng-icon name="lucidePencil" aria-hidden="true" />
+    Edit
+  </a>
+  }
+</app-page-header>
+
+<div class="grid items-start gap-6 lg:grid-cols-2">
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="endpoint-heading"
+  >
+    <h2 id="endpoint-heading" class="font-semibold">Endpoint</h2>
+    <p class="text-muted-foreground mt-1 text-sm">
+      EUDIPLO posts the session and the requested credential here, and issues the claims it answers
+      with.
+    </p>
+    <dl class="mt-4 divide-y text-sm">
+      <div class="flex gap-3 py-3">
+        <dt class="text-muted-foreground w-28 shrink-0">ID</dt>
+        <dd class="min-w-0 font-mono text-[0.8rem] break-all">{{ current.id }}</dd>
+      </div>
+      <div class="flex gap-3 py-3">
+        <dt class="text-muted-foreground w-28 shrink-0">URL</dt>
+        <dd class="flex min-w-0 items-start gap-1">
+          <span class="font-mono text-[0.8rem] break-all">{{ current.url }}</span>
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground hover:bg-muted grid size-6 shrink-0 place-items-center rounded-md"
+            aria-label="Copy the URL"
+            hlmTooltip="Copy URL"
+            (click)="copyUrl(current.url)"
+          >
+            <ng-icon name="lucideCopy" class="text-[0.8rem]" />
+          </button>
+        </dd>
+      </div>
+      <div class="flex gap-3 py-3">
+        <dt class="text-muted-foreground w-28 shrink-0">Host</dt>
+        <dd class="min-w-0 break-all">{{ hostOf(current.url) }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="auth-heading"
+  >
+    <h2 id="auth-heading" class="font-semibold">Authentication</h2>
+    @if (current.auth.type === 'apiKey') {
+    <div class="mt-4 flex items-start gap-3">
+      <span
+        class="bg-primary/8 text-primary dark:bg-primary/15 grid size-9 shrink-0 place-items-center rounded-xl"
+        aria-hidden="true"
+      >
+        <ng-icon name="lucideKeyRound" />
+      </span>
+      <div class="min-w-0 text-sm">
+        <p class="font-medium">API key</p>
+        <p class="text-muted-foreground mt-0.5">
+          EUDIPLO sends the stored key in the header
+          <code class="bg-muted rounded px-1 py-0.5 font-mono text-xs">{{ headerOf(current) }}</code
+          >. The key is never shown.
+        </p>
+      </div>
+    </div>
+    } @else {
+    <div class="mt-4 flex items-start gap-3">
+      <span
+        class="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-xl"
+        aria-hidden="true"
+      >
+        <ng-icon name="lucideShieldOff" />
+      </span>
+      <div class="min-w-0 text-sm">
+        <p class="font-medium">None</p>
+        <p class="text-muted-foreground mt-0.5">EUDIPLO calls the endpoint without credentials.</p>
+      </div>
+    </div>
+    }
+  </section>
+
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 lg:col-span-2 dark:ring-white/8"
+    aria-labelledby="users-heading"
+  >
+    <h2 id="users-heading" class="font-semibold">Used by</h2>
+    @if (configs.isPending()) {
+    <hlm-skeleton class="mt-4 h-10 w-full rounded-lg" />
+    } @else if (configs.isError()) {
+    <p class="text-muted-foreground mt-2 text-sm">
+      The credential types could not be loaded.
+      <button
+        hlmBtn
+        variant="link"
+        size="sm"
+        type="button"
+        class="h-auto p-0"
+        (click)="configs.refetch()"
+      >
+        Retry
+      </button>
+    </p>
+    } @else if (!usedBy().length) {
+    <p class="text-muted-foreground mt-2 text-sm">
+      No credential type fetches its claims from this provider. Offers can still name it.
+    </p>
+    } @else {
+    <p class="text-muted-foreground mt-1 text-sm">
+      These credential types fetch their claims from this provider.
+    </p>
+    <ul class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      @for (config of usedBy(); track config.id) {
+      <li>
+        <a
+          [routerLink]="['/credential-config', config.id]"
+          class="hover:bg-muted/60 flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2.5"
+        >
+          <ng-icon name="lucideIdCard" class="text-muted-foreground shrink-0" aria-hidden="true" />
+          <span class="min-w-0">
+            <span class="block truncate text-sm font-medium">{{ displayName(config) }}</span>
+            <span class="text-muted-foreground block truncate font-mono text-xs"
+              >{{ config.id }}</span
+            >
+          </span>
+        </a>
+      </li>
+      }
+    </ul>
+    }
+  </section>
+</div>
+
+<app-delete-attribute-provider-dialog
+  [provider]="toDelete()"
+  [usedBy]="usedByIds()"
+  (closed)="toDelete.set(null)"
+  (deleted)="onDeleted()"
+/>
+}
