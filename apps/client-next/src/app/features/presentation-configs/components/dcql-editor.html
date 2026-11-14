@@ -1,0 +1,379 @@
+<section class="grid gap-5">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h3 class="font-semibold">Credential query</h3>
+      <p class="text-muted-foreground text-sm">
+        Select credentials, claims and trusted issuers. Advanced DCQL stays available as JSON.
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2">
+      <button
+        hlmBtn
+        type="button"
+        variant="outline"
+        [attr.aria-pressed]="draft().mode === 'visual'"
+        (click)="setMode('visual')"
+      >
+        <ng-icon name="lucideIdCard" aria-hidden="true" />
+        Visual builder
+      </button>
+      <button
+        hlmBtn
+        type="button"
+        variant="outline"
+        [attr.aria-pressed]="draft().mode === 'json'"
+        (click)="setMode('json')"
+      >
+        <ng-icon name="lucideBraces" aria-hidden="true" />
+        DCQL JSON
+      </button>
+    </div>
+  </div>
+
+  @if (switchError()) {
+  <p class="text-destructive text-sm" role="alert">{{ switchError() }}</p>
+  } @if (draft().mode === 'json') {
+  <label class="grid gap-2">
+    <span class="text-sm font-medium">DCQL query</span>
+    <textarea
+      hlmTextarea
+      class="min-h-72 font-mono text-sm"
+      spellcheck="false"
+      [value]="draft().json"
+      [attr.aria-invalid]="showErrors() && !!problem()"
+      (input)="setJson($any($event.target).value)"
+    ></textarea>
+    @if (showErrors() && problem()) {
+    <span class="text-destructive text-sm" role="alert">{{ problem() }}</span>
+    }
+  </label>
+  } @else {
+  <div class="grid gap-4">
+    @for (credential of draft().simple.credentials; track $index; let credentialIndex = $index) {
+    <article class="bg-card grid gap-4 rounded-xl border p-4">
+      <div class="flex items-start justify-between gap-3">
+        <h4 class="font-medium">Credential {{ credentialIndex + 1 }}</h4>
+        <button
+          hlmBtn
+          type="button"
+          variant="ghost"
+          size="icon"
+          [attr.aria-label]="'Remove credential ' + (credential.id || credentialIndex + 1)"
+          (click)="removeCredential(credentialIndex)"
+        >
+          <ng-icon name="lucideTrash2" aria-hidden="true" />
+        </button>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <label class="grid gap-1.5">
+          <span class="text-sm font-medium">Query ID</span>
+          <input
+            hlmInput
+            [value]="credential.id"
+            [attr.aria-invalid]="showErrors() && !credential.id.trim()"
+            (input)="setField(credentialIndex, 'id', $any($event.target).value)"
+          />
+        </label>
+        <label class="grid gap-1.5">
+          <span class="text-sm font-medium">Credential format</span>
+          <select
+            hlmNativeSelect
+            [value]="credential.format"
+            (change)="setFormat(credentialIndex, $any($event.target).value)"
+          >
+            <option value="dc+sd-jwt">SD-JWT VC</option>
+            <option value="mso_mdoc">mDOC</option>
+          </select>
+        </label>
+      </div>
+      <label class="grid gap-1.5">
+        <span class="text-sm font-medium">
+          {{ credential.format === 'mso_mdoc' ? 'Document type' : 'VCT' }}
+        </span>
+        <input
+          hlmInput
+          [value]="credential.type"
+          (input)="setField(credentialIndex, 'type', $any($event.target).value)"
+        />
+      </label>
+      <section class="grid gap-3">
+        <div class="flex items-center justify-between gap-2">
+          <h5 class="text-sm font-medium">Claims</h5>
+          <button
+            hlmBtn
+            type="button"
+            variant="outline"
+            size="sm"
+            (click)="addClaim(credentialIndex)"
+          >
+            <ng-icon name="lucidePlus" aria-hidden="true" />
+            Add claim
+          </button>
+        </div>
+        @for (claim of credential.claims; track $index; let claimIndex = $index) {
+        <div class="grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_1fr_auto]">
+          <div class="grid gap-1">
+            <span class="text-xs font-medium">Claim path</span>
+            @if (credential.format === 'mso_mdoc') {
+            <div class="grid gap-2 sm:grid-cols-2">
+              <input
+                hlmInput
+                aria-label="mDOC namespace"
+                placeholder="Namespace"
+                [value]="claim.path[0]"
+                (input)="setMdocPath(credentialIndex, claimIndex, 0, $any($event.target).value)"
+              />
+              <input
+                hlmInput
+                aria-label="mDOC claim name"
+                placeholder="Claim name"
+                [value]="claim.path[1]"
+                (input)="setMdocPath(credentialIndex, claimIndex, 1, $any($event.target).value)"
+              />
+            </div>
+            } @else {
+            <input
+              hlmInput
+              aria-label="Claim path"
+              [value]="pathText(claim)"
+              placeholder="address.locality"
+              (input)="setPath(credentialIndex, claimIndex, $any($event.target).value)"
+            />
+            }
+          </div>
+          <label class="grid gap-1">
+            <span class="text-xs font-medium">Claim query ID (optional)</span>
+            <input
+              hlmInput
+              aria-label="Claim query ID"
+              [value]="claim.id ?? ''"
+              (input)="setClaimId(credentialIndex, claimIndex, $any($event.target).value)"
+            />
+          </label>
+          <button
+            hlmBtn
+            type="button"
+            variant="ghost"
+            size="icon"
+            [attr.aria-label]="'Remove claim ' + (claimIndex + 1)"
+            (click)="removeClaim(credentialIndex, claimIndex)"
+          >
+            <ng-icon name="lucideTrash2" aria-hidden="true" />
+          </button>
+          <label class="grid gap-1 sm:col-span-2">
+            <span class="text-xs font-medium">Allowed values (optional, one per line)</span>
+            <textarea
+              hlmTextarea
+              rows="2"
+              [value]="(claim.values ?? []).join('\n')"
+              (input)="setClaimValues(credentialIndex, claimIndex, $any($event.target).value)"
+            ></textarea>
+          </label>
+          @if (credential.format === 'mso_mdoc') {
+          <label class="flex items-center gap-2 self-end pb-2 text-sm">
+            <input
+              type="checkbox"
+              [checked]="claim.intent_to_retain ?? false"
+              (change)="setIntentToRetain(credentialIndex, claimIndex, $any($event.target).checked)"
+            />
+            Allow retention
+          </label>
+          }
+        </div>
+        }
+      </section>
+
+      <section class="grid gap-3">
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <h5 class="text-sm font-medium">Trusted issuers</h5>
+          <div class="flex flex-wrap gap-2">
+            <button
+              hlmBtn
+              type="button"
+              size="sm"
+              variant="outline"
+              (click)="addTrust(credentialIndex, 'managed')"
+            >
+              Managed trust list
+            </button>
+            <button
+              hlmBtn
+              type="button"
+              size="sm"
+              variant="outline"
+              (click)="addTrust(credentialIndex, 'external')"
+            >
+              External trust list
+            </button>
+            <button
+              hlmBtn
+              type="button"
+              size="sm"
+              variant="outline"
+              (click)="addTrust(credentialIndex, 'federation')"
+            >
+              Federation anchor
+            </button>
+          </div>
+        </div>
+        @for (authority of credential.trustedAuthorities ?? []; track $index; let authorityIndex =
+        $index) {
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="grid min-w-0 flex-1 gap-1">
+            <span class="text-xs font-medium"
+              >{{ authority.type === 'openid_federation' ? 'Federation trust anchor URL' :
+              trustKind(authority) === 'managed' ? 'Managed trust list ID' : 'External trust-list
+              URL' }}</span
+            >
+            @if (authority.type === 'openid_federation') {
+            <select
+              hlmNativeSelect
+              aria-label="Federation trust anchor"
+              [value]="trustValue(authority)"
+              (change)="setTrust(credentialIndex, authorityIndex, $any($event.target).value)"
+            >
+              <option value="">Select a trust anchor</option>
+              @for (anchor of anchors.data() ?? []; track anchor.id) {
+              <option [value]="anchor.entityId">{{ anchor.description || anchor.entityId }}</option>
+              }
+            </select>
+            @if (anchors.isPending()) {
+            <span class="text-muted-foreground text-xs" role="status">Loading trust anchors…</span>
+            } @else if (anchors.isError()) {
+            <span class="text-destructive text-xs" role="alert">
+              {{ lookupError(anchors.error(), 'Failed to load federation trust anchors') }}
+              <button type="button" class="underline" (click)="anchors.refetch()">Retry</button>
+            </span>
+            } @else if (!anchors.data()?.length) {
+            <span class="text-muted-foreground text-xs"
+              >No federation trust anchors are available.</span
+            >
+            } } @else if (trustKind(authority) === 'managed') {
+            <select
+              hlmNativeSelect
+              aria-label="Managed trust list"
+              [value]="trustValue(authority)"
+              (change)="setTrust(credentialIndex, authorityIndex, $any($event.target).value)"
+            >
+              <option value="">Select a trust list</option>
+              @for (list of trustLists.data() ?? []; track list.id) {
+              <option [value]="list.id">{{ list.description || list.id }}</option>
+              }
+            </select>
+            @if (trustLists.isPending()) {
+            <span class="text-muted-foreground text-xs" role="status">Loading trust lists…</span>
+            } @else if (trustLists.isError()) {
+            <span class="text-destructive text-xs" role="alert">
+              {{ lookupError(trustLists.error(), 'Failed to load managed trust lists') }}
+              <button type="button" class="underline" (click)="trustLists.refetch()">Retry</button>
+            </span>
+            } @else if (!trustLists.data()?.length) {
+            <span class="text-muted-foreground text-xs">No managed trust lists are available.</span>
+            } } @else {
+            <input
+              hlmInput
+              type="url"
+              aria-label="External trust-list URL"
+              [value]="trustValue(authority)"
+              (input)="setTrust(credentialIndex, authorityIndex, $any($event.target).value)"
+            />
+            }
+          </div>
+          <button
+            hlmBtn
+            type="button"
+            variant="ghost"
+            size="icon"
+            [attr.aria-label]="'Remove trusted authority ' + (authorityIndex + 1)"
+            (click)="removeTrust(credentialIndex, authorityIndex)"
+          >
+            <ng-icon name="lucideX" aria-hidden="true" />
+          </button>
+        </div>
+        } @if (showErrors() && trustError(credential.trustedAuthorities); as error) {
+        <p class="text-destructive text-sm" role="alert">{{ error }}</p>
+        }
+      </section>
+    </article>
+    }
+    <div class="flex flex-wrap gap-2">
+      <button hlmBtn type="button" variant="outline" (click)="addCredential()">
+        <ng-icon name="lucidePlus" aria-hidden="true" />
+        Add credential
+      </button>
+      <button hlmBtn type="button" variant="outline" (click)="addCredentialSet()">
+        <ng-icon name="lucidePlus" aria-hidden="true" />
+        Add credential requirement
+      </button>
+    </div>
+    @for (set of draft().simple.credentialSets ?? []; track $index; let setIndex = $index) {
+    <article class="grid gap-3 rounded-xl border p-4">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h4 class="font-medium">Requirement {{ setIndex + 1 }}</h4>
+        <label class="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            [checked]="set.required !== false"
+            (change)="setCredentialSetRequired(setIndex, $any($event.target).checked)"
+          />
+          Required
+        </label>
+        <button
+          hlmBtn
+          type="button"
+          variant="ghost"
+          size="sm"
+          (click)="removeCredentialSet(setIndex)"
+        >
+          <ng-icon name="lucideTrash2" aria-hidden="true" />
+          Remove requirement
+        </button>
+      </div>
+      <p class="text-muted-foreground text-sm">
+        Each alternative is an AND group; alternatives are OR.
+      </p>
+      @for (option of set.options; track $index; let optionIndex = $index) {
+      <fieldset class="grid gap-2 rounded-lg border p-3">
+        <legend class="px-1 text-xs font-medium">Alternative {{ optionIndex + 1 }}</legend>
+        @for (credentialOption of draft().simple.credentials; track credentialOption.id) {
+        <label class="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            [checked]="option.includes(credentialOption.id)"
+            (change)="toggleSetCredential(setIndex, optionIndex, credentialOption.id, $any($event.target).checked)"
+          />
+          {{ credentialOption.id || '(unnamed credential)' }}
+        </label>
+        }
+        <button
+          hlmBtn
+          type="button"
+          size="sm"
+          variant="ghost"
+          class="justify-self-start"
+          [attr.aria-label]="'Remove alternative ' + (optionIndex + 1)"
+          (click)="removeCredentialSetOption(setIndex, optionIndex)"
+        >
+          <ng-icon name="lucideX" aria-hidden="true" />
+          Remove alternative
+        </button>
+      </fieldset>
+      }
+      <button
+        hlmBtn
+        type="button"
+        size="sm"
+        variant="outline"
+        class="justify-self-start"
+        (click)="addCredentialSetOption(setIndex)"
+      >
+        <ng-icon name="lucidePlus" aria-hidden="true" />
+        Add alternative
+      </button>
+    </article>
+    }
+  </div>
+  } @if (showErrors() && problem()) {
+  <p class="text-destructive text-sm" role="alert">{{ problem() }}</p>
+  }
+</section>

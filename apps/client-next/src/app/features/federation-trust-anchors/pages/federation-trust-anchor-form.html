@@ -1,0 +1,194 @@
+<app-page-header
+  [heading]="editing() ? 'Edit federation trust anchor' : 'Register federation trust anchor'"
+  description="Pin public federation keys obtained out of band. EUDIPLO trusts the anchor only when its entity configuration is signed by one of these keys."
+>
+  <a
+    hlmBtn
+    variant="outline"
+    [routerLink]="editing() ? ['/federation-trust-anchor', id()] : '/federation-trust-anchor'"
+  >
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    Cancel
+  </a>
+</app-page-header>
+
+@if (editing() && waiting()) {
+<div role="status" aria-label="Loading trust anchor for editing" class="grid max-w-4xl gap-4">
+  <hlm-skeleton class="h-24 w-full rounded-2xl" />
+  <hlm-skeleton class="h-72 w-full rounded-2xl" />
+</div>
+} @else if (editing() && anchor.isError()) {
+<section class="grid max-w-4xl justify-items-center gap-3 px-6 py-14 text-center" role="alert">
+  @if (notFound(anchor.error())) {
+  <p class="font-semibold">There is no federation trust anchor {{ id() }}</p>
+  } @else {
+  <p class="font-semibold">The trust anchor could not be loaded</p>
+  <p class="text-muted-foreground text-sm">{{ errorMessage(anchor.error()) }}</p>
+  <button hlmBtn variant="outline" type="button" (click)="anchor.refetch()">Retry</button>
+  }
+  <a hlmBtn variant="ghost" routerLink="/federation-trust-anchor">All trust anchors</a>
+</section>
+} @else if (registeredForForm(); as registered) {
+<section
+  class="bg-card grid max-w-3xl justify-items-start gap-3 rounded-2xl p-6 ring-1 ring-black/5 dark:ring-white/8"
+  role="status"
+>
+  <h2 class="text-lg font-semibold">
+    Trust anchor {{ registered.description || registered.id }} registered
+  </h2>
+  <p class="text-muted-foreground text-sm">Return to the configuration form in the other tab.</p>
+  <a hlmBtn [routerLink]="['/federation-trust-anchor', registered.id]">Open trust anchor</a>
+</section>
+} @else { @if (editing()) {
+<app-ownership-notice class="mb-6 block" kind="FederationTrustAnchor" [resource]="owner()" />
+} @if (locked()) {
+<p class="mb-4 text-sm" role="status">{{ locked() }}</p>
+} @else if (editing() && ownership.isError()) {
+<p class="text-muted-foreground mb-4 text-sm" role="status">
+  Ownership could not be checked. The backend still enforces whether this trust anchor can be
+  changed.
+  <button class="underline" type="button" (click)="ownership.refetch()">
+    Retry ownership check
+  </button>
+</p>
+}
+
+<form #formElement class="grid max-w-4xl gap-6" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <fieldset [disabled]="!!locked()" class="grid gap-6 disabled:opacity-60">
+    <legend class="sr-only">Federation trust anchor</legend>
+    <section class="bg-card grid gap-5 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8">
+      <div>
+        <h2 class="font-semibold">Trust anchor</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          The entity ID that issuance and presentation configurations name.
+        </p>
+      </div>
+      <label class="grid gap-1.5 text-sm" for="federation-anchor-id">
+        <span class="font-medium">ID</span>
+        <input
+          id="federation-anchor-id"
+          class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+          formControlName="id"
+          [readOnly]="editing()"
+          maxlength="255"
+          autocomplete="off"
+          placeholder="eu-federation"
+          [attr.aria-invalid]="form.controls.id.touched && form.controls.id.invalid"
+        />
+        @if (form.controls.id.touched && form.controls.id.invalid) {
+        <span class="text-destructive text-xs" role="alert">
+          {{ fieldError('id', 'Use at most 255 characters') }}
+        </span>
+        }
+        <span class="text-muted-foreground text-xs">
+          Unique in this tenant; use letters, digits, period, underscore or hyphen.
+        </span>
+      </label>
+
+      <label class="grid gap-1.5 text-sm" for="federation-anchor-entity-id">
+        <span class="font-medium">Entity ID</span>
+        <input
+          id="federation-anchor-entity-id"
+          class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+          formControlName="entityId"
+          type="url"
+          maxlength="2048"
+          placeholder="https://trust-anchor.example"
+          [attr.aria-invalid]="form.controls.entityId.touched && form.controls.entityId.invalid"
+        />
+        @if (form.controls.entityId.touched && form.controls.entityId.invalid) {
+        <span class="text-destructive text-xs" role="alert">
+          {{ fieldError('entityId', 'Enter a valid federation entity ID') }}
+        </span>
+        }
+        <span class="text-muted-foreground text-xs">
+          Use the exact HTTPS identifier that configuration files will name.
+        </span>
+      </label>
+      @if (entityIdChangeWarning()) {
+      <p class="text-warning-foreground bg-warning/10 rounded-lg p-3 text-sm" role="status">
+        {{ entityIdChangeWarning() }}
+      </p>
+      }
+
+      <label class="grid gap-1.5 text-sm" for="federation-anchor-description">
+        <span class="font-medium"
+          >Description <span class="text-muted-foreground">(optional)</span></span
+        >
+        <input
+          id="federation-anchor-description"
+          class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+          formControlName="description"
+          maxlength="1000"
+          placeholder="EU federation"
+          [attr.aria-invalid]="form.controls.description.touched && form.controls.description.invalid"
+        />
+        @if (form.controls.description.touched && form.controls.description.invalid) {
+        <span class="text-destructive text-xs" role="alert">Use at most 1000 characters.</span>
+        }
+      </label>
+    </section>
+
+    <section class="bg-card grid gap-5 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8">
+      <div class="flex items-start gap-3">
+        <span
+          class="bg-accent text-accent-foreground grid size-9 shrink-0 place-items-center rounded-xl"
+        >
+          <ng-icon name="lucideKeyRound" aria-hidden="true" />
+        </span>
+        <div>
+          <h2 class="font-semibold">Pinned federation keys</h2>
+          <p class="text-muted-foreground mt-1 text-sm">
+            Paste the public JWK set obtained out of band from the federation operator.
+          </p>
+        </div>
+      </div>
+      <label class="grid gap-1.5 text-sm" for="federation-anchor-jwks">
+        <span class="font-medium">JWK set</span>
+        <textarea
+          id="federation-anchor-jwks"
+          class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground min-h-64 py-2 font-mono text-xs"
+          formControlName="jwks"
+          spellcheck="false"
+          aria-describedby="federation-anchor-jwks-hint"
+          [attr.aria-invalid]="form.controls.jwks.touched && form.controls.jwks.invalid"
+        ></textarea>
+        <span id="federation-anchor-jwks-hint" class="text-muted-foreground text-xs">
+          Include a <code>keys</code> array with key type and ID. Never include private members such
+          as <code>d</code>, <code>p</code> or <code>k</code>.
+        </span>
+        @if (form.controls.jwks.touched && form.controls.jwks.invalid) {
+        <span class="text-destructive text-xs" role="alert">
+          {{ fieldError('jwks', 'Check the JWK set') }}
+        </span>
+        }
+      </label>
+    </section>
+  </fieldset>
+
+  <div class="flex flex-wrap justify-end gap-2">
+    <a
+      hlmBtn
+      variant="ghost"
+      [routerLink]="editing() ? ['/federation-trust-anchor', id()] : '/federation-trust-anchor'"
+      >Cancel</a
+    >
+    <span id="anchor-save-locked" class="sr-only">{{ locked() }}</span>
+    <button
+      hlmBtn
+      type="submit"
+      [class.cursor-not-allowed]="!!locked() || saving()"
+      [class.opacity-50]="!!locked() || saving()"
+      [attr.aria-disabled]="locked() || saving() ? 'true' : null"
+      [attr.aria-describedby]="locked() ? 'anchor-save-locked' : null"
+      [hlmTooltip]="locked() || (saving() ? 'Saving trust anchor…' : '')"
+    >
+      @if (locked()) {
+      <ng-icon name="lucideLock" aria-hidden="true" />
+      } @else {
+      <ng-icon name="lucideSave" aria-hidden="true" />
+      } {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Register trust anchor' }}
+    </button>
+  </div>
+</form>
+}

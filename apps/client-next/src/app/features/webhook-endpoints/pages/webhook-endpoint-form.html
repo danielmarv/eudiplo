@@ -1,0 +1,128 @@
+@if (editing()) {
+<app-ownership-notice class="mb-6 block empty:hidden" kind="WebhookEndpoint" [resource]="owner()" />
+}
+
+<app-page-header
+  [heading]="editing() ? 'Edit webhook endpoint' : 'Add webhook endpoint'"
+  description="A service of yours that EUDIPLO notifies when a presentation ends, a wallet reports on a credential, or credentials are revoked."
+>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    [attr.aria-disabled]="(editing() && !endpoint.isSuccess()) || null"
+    (click)="!(editing() && !endpoint.isSuccess()) && openJson()"
+  >
+    <ng-icon name="lucideCode" aria-hidden="true" />
+    Edit as JSON
+  </button>
+</app-page-header>
+
+@if (editing() && endpoint.isPending()) {
+<div role="status" aria-label="Loading the webhook endpoint" class="grid max-w-4xl gap-6">
+  <hlm-skeleton class="h-80 w-full rounded-2xl" />
+  <hlm-skeleton class="h-48 w-full rounded-2xl" />
+</div>
+} @else if (editing() && endpoint.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  @if (notFound(endpoint.error())) {
+  <p class="font-semibold">There is no webhook endpoint {{ id() }}</p>
+  } @else {
+  <p class="font-semibold">The webhook endpoint could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(endpoint.error()) }}</p>
+  <p class="text-muted-foreground text-sm">It can only be edited once it has loaded.</p>
+  }
+  <div class="flex flex-wrap justify-center gap-2">
+    @if (!notFound(endpoint.error())) {
+    <button hlmBtn variant="outline" type="button" (click)="endpoint.refetch()">Retry</button>
+    }
+    <a hlmBtn variant="ghost" routerLink="/webhook-endpoints">
+      <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+      All webhook endpoints
+    </a>
+  </div>
+</section>
+} @else {
+<form #formElement class="grid max-w-4xl gap-6" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <fieldset [disabled]="!!locked()" class="disabled:opacity-60">
+    <legend class="sr-only">Webhook endpoint</legend>
+    <app-endpoint-fields
+      [form]="form"
+      [editing]="editing()"
+      namePlaceholder="Membership results"
+      urlHint="EUDIPLO posts presentation results, issuance notifications and wallet unit revocations to the URL."
+      (nameInput)="onNameInput()"
+      (idInput)="onIdInput()"
+    />
+  </fieldset>
+
+  <div class="flex flex-wrap justify-end gap-2">
+    <a
+      hlmBtn
+      variant="ghost"
+      [routerLink]="editing() ? ['/webhook-endpoints', id()] : '/webhook-endpoints'"
+      >Cancel</a
+    >
+    @if (locked()) {
+    <span id="endpoint-locked" class="sr-only">{{ locked() }}</span>
+    <button
+      hlmBtn
+      type="button"
+      class="cursor-not-allowed opacity-50"
+      aria-disabled="true"
+      aria-describedby="endpoint-locked"
+      [hlmTooltip]="locked()"
+    >
+      <ng-icon name="lucideLock" aria-hidden="true" />
+      Save changes
+    </button>
+    } @else {
+    <button hlmBtn type="submit" [attr.aria-disabled]="saving() || null">
+      @if (saving()) {
+      <hlm-spinner class="size-4" aria-hidden="true" />
+      {{ editing() ? 'Saving…' : 'Adding…' }} } @else { {{ editing() ? 'Save changes' : 'Add webhook
+      endpoint' }} }
+    </button>
+    }
+  </div>
+</form>
+}
+
+<hlm-dialog [state]="jsonOpen() ? 'open' : 'closed'" (stateChanged)="onJsonState($event)">
+  <hlm-dialog-content *hlmDialogPortal="let ctx" class="sm:max-w-2xl">
+    <hlm-dialog-header>
+      <h2 hlmDialogTitle>Webhook endpoint as JSON</h2>
+      <p hlmDialogDescription>
+        As the API takes it. A stored key shows as <code class="font-mono">&lt;redacted&gt;</code>;
+        leave it so to keep the key.
+      </p>
+    </hlm-dialog-header>
+    <label class="sr-only" for="endpoint-json">Webhook endpoint as JSON</label>
+    <textarea
+      hlmTextarea
+      id="endpoint-json"
+      class="min-h-72 font-mono text-[0.8125rem]"
+      spellcheck="false"
+      [value]="json()"
+      [attr.aria-invalid]="!!jsonError() || null"
+      [attr.aria-describedby]="jsonError() ? 'endpoint-json-error' : null"
+      (input)="json.set($any($event.target).value); jsonError.set('')"
+    ></textarea>
+    @if (jsonError()) {
+    <p id="endpoint-json-error" class="text-destructive text-sm" role="alert">{{ jsonError() }}</p>
+    }
+    <hlm-dialog-footer>
+      <button hlmBtn variant="ghost" type="button" (click)="jsonOpen.set(false)">Cancel</button>
+      <button hlmBtn type="button" (click)="applyJson()">Use this JSON</button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>

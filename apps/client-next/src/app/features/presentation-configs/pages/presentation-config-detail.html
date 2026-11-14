@@ -1,0 +1,303 @@
+@if (config.isPending()) {
+<div class="grid max-w-5xl gap-4" role="status" aria-label="Loading presentation configuration">
+  <hlm-skeleton class="h-28 w-full rounded-2xl" />
+  <hlm-skeleton class="h-96 w-full rounded-2xl" />
+</div>
+} @else if (config.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl">
+    <ng-icon name="lucideTriangleAlert" class="text-xl" aria-hidden="true" />
+  </span>
+  <p class="font-semibold">The presentation configuration could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ configError(config.error()) }}</p>
+  <div class="flex flex-wrap justify-center gap-2">
+    <button hlmBtn variant="outline" type="button" (click)="config.refetch()">Retry</button>
+    <a hlmBtn variant="ghost" routerLink="/presentation-config">
+      <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+      All presentation configurations
+    </a>
+  </div>
+</section>
+} @else if (config.data(); as item) {
+<app-ownership-notice kind="PresentationConfig" [resource]="owner()" />
+
+<app-page-header
+  [heading]="item.id"
+  [description]="item.description || 'Reusable request for a wallet presentation.'"
+>
+  <a hlmBtn variant="ghost" routerLink="/presentation-config">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    All configurations
+  </a>
+  @if (canCreateOffer()) {
+  <a hlmBtn variant="outline" [routerLink]="['/offer/presentation', item.id]">
+    <ng-icon name="lucidePlus" aria-hidden="true" />
+    Create offer
+  </a>
+  } @if (canDownload()) {
+  <button hlmBtn variant="outline" type="button" (click)="downloadConfiguration()">
+    <ng-icon name="lucideDownload" aria-hidden="true" />
+    Download config
+  </button>
+  }
+  <a hlmBtn variant="outline" [routerLink]="['/presentation-config', item.id, 'copy']">
+    <ng-icon name="lucideCopy" aria-hidden="true" />
+    Copy
+  </a>
+  @if (locked()) {
+  <button hlmBtn variant="outline" type="button" aria-disabled="true" [hlmTooltip]="locked()">
+    <ng-icon name="lucidePencil" aria-hidden="true" />
+    Edit
+  </button>
+  } @else {
+  <a hlmBtn [routerLink]="['/presentation-config', item.id, 'edit']">
+    <ng-icon name="lucidePencil" aria-hidden="true" />
+    Edit
+  </a>
+  }
+</app-page-header>
+
+<div class="grid max-w-5xl gap-5">
+  <section class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div class="flex items-start gap-3">
+      <span
+        class="bg-accent text-accent-foreground grid size-10 shrink-0 place-items-center rounded-xl"
+      >
+        <ng-icon name="lucideBadgeCheck" aria-hidden="true" />
+      </span>
+      <div>
+        <h2 class="font-heading text-xl font-semibold">Configuration details</h2>
+        <p class="text-muted-foreground text-sm">
+          Request lifetime, status handling and origin restrictions.
+        </p>
+      </div>
+    </div>
+    <dl class="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+      <div>
+        <dt class="text-muted-foreground text-xs">ID</dt>
+        <dd class="font-mono">{{ item.id }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Created</dt>
+        <dd>{{ item.createdAt | date: 'medium' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Request lifetime</dt>
+        <dd>{{ formatLifetime(item.lifeTime) }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Status-list checks</dt>
+        <dd>{{ statusMode() }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Access key chain</dt>
+        <dd>{{ item.accessKeyChainId || 'Tenant default' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Redirect URI</dt>
+        <dd class="break-all">{{ item.redirectUri || 'None' }}</dd>
+      </div>
+      <div class="sm:col-span-2">
+        <dt class="text-muted-foreground text-xs">Allowed origins</dt>
+        <dd class="break-all">
+          {{ item.allowedOrigins?.length ? item.allowedOrigins.join(', ') : 'Not restricted' }}
+        </dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div class="flex items-start gap-3">
+      <span class="bg-primary/8 text-primary grid size-10 shrink-0 place-items-center rounded-xl">
+        <ng-icon name="lucideFileJson" aria-hidden="true" />
+      </span>
+      <div>
+        <h2 class="font-heading text-xl font-semibold">Credential query (DCQL)</h2>
+        <p class="text-muted-foreground text-sm">
+          The credentials and claims requested from a wallet.
+        </p>
+      </div>
+    </div>
+    @if (credentialList(item).length) {
+    <ul class="grid gap-3">
+      @for (credential of credentialList(item); track credential['id']) {
+      <li class="rounded-xl border p-4">
+        <div class="flex flex-wrap items-center gap-2">
+          <strong class="font-mono">{{ credential['id'] }}</strong>
+          <span class="bg-muted rounded-md px-2 py-0.5 text-xs">{{ credential['format'] }}</span>
+        </div>
+        <pre class="bg-muted mt-3 overflow-auto rounded-lg p-3 font-mono text-xs">
+{{ credential | json }}</pre>
+      </li>
+      }
+    </ul>
+    } @else {
+    <p class="text-muted-foreground text-sm">The configuration has no credential queries.</p>
+    }
+    <details>
+      <summary class="cursor-pointer text-sm font-medium">Full DCQL JSON</summary>
+      <pre class="bg-muted mt-3 overflow-auto rounded-xl p-4 font-mono text-xs">
+{{ item.dcql_query | json }}</pre>
+    </details>
+  </section>
+
+  <section class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex items-start gap-3">
+        <span
+          class="bg-accent text-accent-foreground grid size-10 shrink-0 place-items-center rounded-xl"
+        >
+          <ng-icon name="lucideShieldCheck" aria-hidden="true" />
+        </span>
+        <div>
+          <h2 class="font-heading text-xl font-semibold">Registration certificate</h2>
+          <p class="text-muted-foreground text-sm">{{ registrationLabel().detail }}</p>
+        </div>
+      </div>
+      @if (registrationState() !== 'none') {
+      <button
+        hlmBtn
+        variant="outline"
+        type="button"
+        [attr.aria-disabled]="reissuing() || locked() || null"
+        [hlmTooltip]="locked()"
+        (click)="!reissuing() && !locked() && reissueCertificate()"
+      >
+        @if (reissuing()) { <hlm-spinner class="size-4" aria-hidden="true" /> } @else {
+        <ng-icon name="lucideRefreshCw" aria-hidden="true" />
+        } {{ reissuing() ? 'Reissuing…' : 'Reissue now' }}
+      </button>
+      }
+    </div>
+    <dl class="grid gap-3 sm:grid-cols-2">
+      <div>
+        <dt class="text-muted-foreground text-xs">Status</dt>
+        <dd>{{ registrationLabel().label }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Source</dt>
+        <dd>
+          {{ item.registration_cert ? (item.registration_cert.jwt ? 'Imported JWT' :
+          item.registration_cert.id ? 'Registrar certificate ID' : 'Registrar request') : 'None' }}
+        </dd>
+      </div>
+    </dl>
+    @if (certificateJwt(); as jwt) {
+    <details>
+      <summary class="cursor-pointer text-sm font-medium">Registration certificate JWT</summary>
+      <pre class="bg-muted mt-3 overflow-auto rounded-xl p-4 font-mono text-xs break-all">
+{{ jwt }}</pre>
+    </details>
+    <div class="grid gap-3 lg:grid-cols-2">
+      <details>
+        <summary class="cursor-pointer text-sm font-medium">JWT header</summary>
+        <pre class="bg-muted mt-2 overflow-auto rounded-xl p-4 font-mono text-xs">
+{{ parsedHeader() }}</pre>
+      </details>
+      <details>
+        <summary class="cursor-pointer text-sm font-medium">JWT payload</summary>
+        <pre class="bg-muted mt-2 overflow-auto rounded-xl p-4 font-mono text-xs">
+{{ parsedPayload() }}</pre>
+      </details>
+    </div>
+    }
+  </section>
+
+  <section class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div class="flex items-start gap-3">
+      <span
+        class="bg-accent text-accent-foreground grid size-10 shrink-0 place-items-center rounded-xl"
+      >
+        <ng-icon name="lucideExternalLink" aria-hidden="true" />
+      </span>
+      <div>
+        <h2 class="font-heading text-xl font-semibold">Integrations</h2>
+        <p class="text-muted-foreground text-sm">
+          Webhook and additional data sent with the request.
+        </p>
+      </div>
+    </div>
+    <div>
+      <h3 class="text-sm font-medium">Webhook endpoint</h3>
+      @if (item.webhookEndpointId) {
+      <a hlmBtn variant="link" [routerLink]="['/webhook-endpoints', item.webhookEndpointId]">
+        {{ item.webhookEndpointId }}
+        <ng-icon name="lucideExternalLink" aria-hidden="true" />
+      </a>
+      } @else {
+      <p class="text-muted-foreground text-sm">None configured</p>
+      }
+    </div>
+    @if (item.attached?.length) {
+    <details>
+      <summary class="cursor-pointer text-sm font-medium">Attached data</summary>
+      <pre class="bg-muted mt-3 overflow-auto rounded-xl p-4 font-mono text-xs">
+{{ item.attached | json }}</pre>
+    </details>
+    } @if (item.transaction_data?.length) {
+    <details>
+      <summary class="cursor-pointer text-sm font-medium">Transaction data</summary>
+      <pre class="bg-muted mt-3 overflow-auto rounded-xl p-4 font-mono text-xs">
+{{ item.transaction_data | json }}</pre>
+    </details>
+    }
+  </section>
+
+  <section class="flex justify-end">
+    @if (locked()) {
+    <button
+      hlmBtn
+      variant="outline"
+      type="button"
+      class="text-muted-foreground cursor-not-allowed opacity-50"
+      aria-disabled="true"
+      [hlmTooltip]="locked()"
+    >
+      <ng-icon name="lucideTrash2" aria-hidden="true" />
+      Delete configuration
+    </button>
+    } @else {
+    <button
+      hlmBtn
+      variant="outline"
+      class="text-destructive hover:bg-destructive/10"
+      type="button"
+      (click)="deleteOpen.set(true)"
+    >
+      <ng-icon name="lucideTrash2" aria-hidden="true" />
+      Delete configuration
+    </button>
+    }
+  </section>
+</div>
+}
+
+<hlm-dialog
+  [state]="deleteOpen() ? 'open' : 'closed'"
+  (stateChanged)="deleteOpen.set($event === 'open')"
+>
+  <hlm-dialog-content *hlmDialogPortal="let ctx" class="sm:max-w-lg">
+    <hlm-dialog-header>
+      <h2 hlmDialogTitle>Delete presentation configuration?</h2>
+      <p hlmDialogDescription>
+        This permanently deletes “{{ id() }}”. Existing presentation sessions are not changed.
+      </p>
+    </hlm-dialog-header>
+    <hlm-dialog-footer>
+      <button hlmBtn variant="ghost" type="button" (click)="deleteOpen.set(false)">Cancel</button>
+      <button
+        hlmBtn
+        variant="destructive"
+        type="button"
+        [attr.aria-disabled]="deleting() || null"
+        (click)="!deleting() && deleteConfiguration()"
+      >
+        @if (deleting()) { <hlm-spinner class="size-4" aria-hidden="true" /> } {{ deleting() ?
+        'Deleting…' : 'Delete configuration' }}
+      </button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>

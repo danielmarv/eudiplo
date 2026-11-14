@@ -47,8 +47,8 @@ import {
   createPresentationRequestMutation,
   defaultAccessKeyChainQuery,
   keyChainsQuery,
-  presentationConfigsQuery,
 } from '../data/verification-queries';
+import { presentationConfigsQuery } from '../../presentation-configs/data/presentation-config-queries';
 import { PageHeader } from '../../../shared/pages/page-header';
 
 /** Roles that may read key chains, so the page can check the access certificate first. */

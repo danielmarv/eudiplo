@@ -1,0 +1,155 @@
+<app-page-header
+  heading="Federation trust anchors"
+  description="OpenID Federation trust anchors and their pinned federation keys. Issuance and presentation configurations trust a federation only through a registered anchor."
+>
+  <a hlmBtn routerLink="create">
+    <ng-icon name="lucidePlus" aria-hidden="true" />
+    Register trust anchor
+  </a>
+</app-page-header>
+
+<section
+  class="bg-card overflow-hidden rounded-2xl shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+  aria-label="Federation trust anchors"
+>
+  @if (anchors.isPending()) {
+  <div class="grid gap-3 p-5" aria-label="Loading federation trust anchors" role="status">
+    @for (row of [1, 2, 3]; track row) {
+    <hlm-skeleton class="h-14 w-full rounded-xl" />
+    }
+  </div>
+  } @else if (anchors.isError()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center" role="alert">
+    <span
+      class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideTriangleAlert" class="text-xl" />
+    </span>
+    <p class="font-semibold">Federation trust anchors could not be loaded</p>
+    <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(anchors.error()) }}</p>
+    <button hlmBtn variant="outline" type="button" (click)="anchors.refetch()">Retry</button>
+  </div>
+  } @else if (!anchors.data()?.length) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <span
+      class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideKeyRound" class="text-xl" />
+    </span>
+    <p class="font-semibold">No federation trust anchors yet</p>
+    <p class="text-muted-foreground max-w-md text-sm">
+      Register an anchor with federation keys obtained out of band before configuring trust in it.
+    </p>
+    <a hlmBtn routerLink="create">
+      <ng-icon name="lucidePlus" aria-hidden="true" />
+      Register trust anchor
+    </a>
+  </div>
+  } @else {
+  <div hlmTableContainer>
+    <table hlmTable class="table-fixed">
+      <thead hlmTHead class="bg-muted/40">
+        <tr hlmTr class="hover:bg-transparent">
+          <th hlmTh scope="col" class="ps-4 pe-2 sm:ps-5">Trust anchor</th>
+          <th hlmTh scope="col" class="hidden px-3 md:table-cell">Entity ID</th>
+          <th hlmTh scope="col" class="hidden px-3 lg:table-cell">Pinned keys</th>
+          <th hlmTh scope="col" class="w-24 pe-3 sm:pe-5"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody hlmTBody>
+        @for (anchor of anchors.data(); track anchor.id) {
+        <tr hlmTr class="hover:bg-muted/40">
+          <td hlmTd class="py-3 ps-4 pe-2 sm:ps-5">
+            <div class="flex min-w-0 items-center gap-3">
+              <span
+                class="bg-accent text-accent-foreground grid size-9 shrink-0 place-items-center rounded-xl"
+                aria-hidden="true"
+              >
+                <ng-icon name="lucideKeyRound" />
+              </span>
+              <span class="min-w-0">
+                <a
+                  [routerLink]="anchor.id"
+                  class="block truncate font-mono text-[0.8rem] font-semibold hover:underline"
+                  [title]="anchor.id"
+                  >{{ anchor.description || anchor.id }}</a
+                >
+                <span class="text-muted-foreground flex flex-wrap items-center gap-x-1.5 text-xs">
+                  <span>ID: {{ anchor.id }}</span>
+                  @if (locked(anchor.id); as reason) {
+                  <span
+                    class="bg-muted inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium"
+                    [hlmTooltip]="reason"
+                  >
+                    <ng-icon name="lucideLock" aria-hidden="true" />
+                    From a file
+                    <span class="sr-only">: {{ reason }}</span>
+                  </span>
+                  }
+                </span>
+              </span>
+            </div>
+          </td>
+          <td hlmTd class="hidden px-3 py-3 md:table-cell">
+            <code
+              class="text-muted-foreground block max-w-full truncate text-xs"
+              [title]="anchor.entityId"
+            >
+              {{ anchor.entityId }}
+            </code>
+          </td>
+          <td hlmTd class="text-muted-foreground hidden px-3 py-3 tabular-nums lg:table-cell">
+            {{ keyCount(anchor.jwks) }}
+          </td>
+          <td hlmTd class="py-3 pe-3 sm:pe-5">
+            <div class="flex justify-end gap-1">
+              <a
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                [routerLink]="anchor.id"
+                [attr.aria-label]="'View trust anchor ' + anchor.id"
+                hlmTooltip="Open"
+              >
+                <ng-icon name="lucideChevronRight" />
+              </a>
+              @if (!locked(anchor.id)) {
+              <a
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                [routerLink]="[anchor.id, 'edit']"
+                [attr.aria-label]="'Edit trust anchor ' + anchor.id"
+                hlmTooltip="Edit"
+              >
+                <ng-icon name="lucidePencil" aria-hidden="true" />
+              </a>
+              } @else {
+              <span [id]="'edit-locked-' + anchor.id" class="sr-only">
+                {{ locked(anchor.id) }}
+              </span>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                class="cursor-not-allowed opacity-50"
+                aria-disabled="true"
+                [attr.aria-label]="'Edit trust anchor ' + anchor.id"
+                [attr.aria-describedby]="'edit-locked-' + anchor.id"
+                [hlmTooltip]="locked(anchor.id)"
+              >
+                <ng-icon name="lucideLock" aria-hidden="true" />
+              </button>
+              }
+            </div>
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</section>

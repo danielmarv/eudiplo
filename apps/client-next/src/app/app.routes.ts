@@ -96,22 +96,78 @@ export const routes: Routes = [
         loadChildren: () =>
           import('./features/verification/verification.routes').then((m) => m.VERIFICATION_ROUTES),
       },
-      pending('presentation-config', 'Verification configs', ['presentation:manage']),
+      {
+        path: 'presentation-config',
+        title: 'Presentation configurations',
+        canActivate: [requireRole('presentation:manage')],
+        loadChildren: () =>
+          import('./features/presentation-configs/presentation-configs.routes').then(
+            (m) => m.PRESENTATION_CONFIG_ROUTES
+          ),
+      },
 
-      // Sessions: the list checks its roles itself, the settings need a manage role.
-      pending('session-management/config', 'Session settings', ISSUES_OR_VERIFIES),
-      pending('session-management', 'Sessions'),
+      {
+        path: 'session-management',
+        loadChildren: () =>
+          import('./features/session-management/session-management.routes').then(
+            (m) => m.SESSION_MANAGEMENT_ROUTES
+          ),
+      },
 
       // Trust and keys
-      pending('keys', 'Keys', KEY_CHAIN_ROLES),
-      pending('kms', 'KMS providers', KEY_CHAIN_ROLES),
-      pending('trust-list', 'Trust lists', ISSUES_OR_VERIFIES),
-      pending('federation-trust-anchor', 'Federation trust anchors', ISSUES_OR_VERIFIES),
+      {
+        path: 'keys',
+        title: 'Keys',
+        canActivate: [requireRole(...KEY_CHAIN_ROLES)],
+        loadChildren: () => import('./features/keys/keys.routes').then((m) => m.KEYS_ROUTES),
+      },
+      {
+        path: 'kms',
+        title: 'KMS providers',
+        canActivate: [requireRole(...KEY_CHAIN_ROLES)],
+        loadChildren: () => import('./features/kms/kms.routes').then((m) => m.KMS_ROUTES),
+      },
+      {
+        path: 'trust-list',
+        title: 'Trust lists',
+        canActivate: [requireRole(...ISSUES_OR_VERIFIES)],
+        loadChildren: () =>
+          import('./features/trust-lists/trust-lists.routes').then((m) => m.TRUST_LIST_ROUTES),
+      },
+      {
+        path: 'federation-trust-anchor',
+        title: 'Federation trust anchors',
+        canActivate: [requireRole(...ISSUES_OR_VERIFIES)],
+        loadChildren: () =>
+          import('./features/federation-trust-anchors/federation-trust-anchors.routes').then(
+            (m) => m.FEDERATION_TRUST_ANCHOR_ROUTES
+          ),
+      },
 
       // Integrations
-      pending('webhook-endpoints', 'Webhook endpoints', ISSUES_OR_VERIFIES),
-      pending('registrar', 'Registrar', ['registrar:manage']),
-      pending('schema', 'Schemas', ['registrar:manage']),
+      {
+        path: 'webhook-endpoints',
+        title: 'Webhook endpoints',
+        canActivate: [requireRole(...ISSUES_OR_VERIFIES)],
+        loadChildren: () =>
+          import('./features/webhook-endpoints/webhook-endpoints.routes').then(
+            (m) => m.WEBHOOK_ENDPOINT_ROUTES
+          ),
+      },
+      {
+        path: 'registrar',
+        title: 'Registrar',
+        canActivate: [requireRole('registrar:manage')],
+        loadChildren: () =>
+          import('./features/registrar/registrar.routes').then((m) => m.REGISTRAR_ROUTES),
+      },
+      {
+        path: 'schema',
+        title: 'Schemas',
+        canActivate: [requireRole('registrar:manage')],
+        loadChildren: () =>
+          import('./features/schemas/schemas.routes').then((m) => m.SCHEMA_ROUTES),
+      },
 
       // Administration
       {

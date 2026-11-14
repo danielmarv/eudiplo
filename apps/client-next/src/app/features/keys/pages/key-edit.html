@@ -1,0 +1,142 @@
+@if (key.isPending()) {
+<div class="grid max-w-4xl gap-3" role="status" aria-label="Loading key chain">
+  <hlm-skeleton class="h-20 rounded-xl" />
+  <hlm-skeleton class="h-56 rounded-xl" />
+</div>
+} @else if (key.isError()) {
+<section
+  class="grid max-w-4xl justify-items-center gap-3 rounded-2xl bg-card px-6 py-14 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <ng-icon name="lucideTriangleAlert" class="text-destructive text-xl" aria-hidden="true" />
+  <p class="font-semibold">The key chain could not be loaded</p>
+  <p class="text-muted-foreground text-sm">{{ errorMessage(key.error()) }}</p>
+  <button hlmBtn variant="outline" type="button" (click)="key.refetch()">Retry</button>
+  <a hlmBtn variant="ghost" routerLink="/keys">Back to keys</a>
+</section>
+} @else if (key.data(); as item) {
+<app-ownership-notice
+  class="mb-6 block empty:hidden"
+  kind="KeyChain"
+  [resource]="ownershipResource()"
+/>
+<app-page-header heading="Edit key chain" [description]="item.description || item.id">
+  <a hlmBtn variant="ghost" [routerLink]="['/keys', item.id]"
+    ><ng-icon name="lucideArrowLeft" aria-hidden="true" />Key details</a
+  >
+</app-page-header>
+
+@if (lock()) {
+<div
+  class="mb-5 flex gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm"
+  role="note"
+>
+  <ng-icon
+    name="lucideTriangleAlert"
+    class="text-amber-700 dark:text-amber-300"
+    aria-hidden="true"
+  />
+  <span>{{ lock() }}</span>
+</div>
+}
+
+<form #formElement class="grid max-w-4xl gap-5" [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <section class="bg-card rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8">
+    <h2 class="font-semibold">Key chain information</h2>
+    <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+      <div>
+        <dt class="text-muted-foreground">ID</dt>
+        <dd class="font-mono break-all">{{ item.id }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground">Type</dt>
+        <dd>{{ item.type === 'internalChain' ? 'Internal chain' : 'Standalone' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground">Usage</dt>
+        <dd>{{ usageLabel(item.usageType) }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section
+    class="bg-card grid gap-5 rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+  >
+    <h2 class="font-semibold">Description</h2>
+    <hlm-field class="gap-2">
+      <label hlmFieldLabel for="key-description">Description</label>
+      <input
+        hlmInput
+        id="key-description"
+        class="h-10"
+        formControlName="description"
+        placeholder="Optional description"
+      />
+    </hlm-field>
+  </section>
+
+  @if (internalChain) {
+  <section
+    class="bg-card grid gap-5 rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+  >
+    <div>
+      <h2 class="font-semibold">Rotation policy</h2>
+      <p class="text-muted-foreground mt-1 text-sm">
+        Configure automatic key rotation and signing-certificate validity.
+      </p>
+    </div>
+    <fieldset [disabled]="!!lock()" class="grid gap-5">
+      <label class="flex items-center gap-2 text-sm"
+        ><input type="checkbox" class="accent-primary" formControlName="rotationEnabled" />Enable
+        automatic key rotation</label
+      >
+      <div class="grid gap-5 sm:grid-cols-2">
+        @if (form.controls.rotationEnabled.value) {
+        <hlm-field class="gap-2">
+          <label hlmFieldLabel for="rotation-days">Rotation interval (days)</label>
+          <input
+            hlmInput
+            id="rotation-days"
+            type="number"
+            min="1"
+            max="3650"
+            step="1"
+            formControlName="rotationIntervalDays"
+          />
+          <p hlmFieldDescription>Enter 1 to 3650 days.</p>
+        </hlm-field>
+        }
+        <hlm-field class="gap-2">
+          <label hlmFieldLabel for="certificate-days">Certificate validity (days)</label>
+          <input
+            hlmInput
+            id="certificate-days"
+            type="number"
+            min="1"
+            max="3650"
+            step="1"
+            formControlName="certValidityDays"
+          />
+          <p hlmFieldDescription>Enter 1 to 3650 days.</p>
+        </hlm-field>
+      </div>
+    </fieldset>
+  </section>
+  }
+
+  <div class="flex flex-wrap justify-end gap-2">
+    <button hlmBtn variant="ghost" type="button" [routerLink]="['/keys', item.id]">Cancel</button>
+    @if (lock()) {
+    <button hlmBtn type="button" aria-disabled="true" [hlmTooltip]="lock()">
+      <ng-icon name="lucideTriangleAlert" aria-hidden="true" />Save changes
+    </button>
+    } @else { @if (form.dirty) {
+    <button hlmBtn variant="ghost" type="button" (click)="discard()">Discard changes</button> }
+    <button hlmBtn type="submit" [attr.aria-disabled]="saving() || null">
+      @if (saving()) { <hlm-spinner class="size-4" aria-hidden="true" />Saving… } @else {
+      <ng-icon name="lucideSave" aria-hidden="true" />Save changes }
+    </button>
+    }
+  </div>
+</form>
+}

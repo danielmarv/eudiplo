@@ -1,0 +1,174 @@
+<app-page-header
+  heading="Presentation configurations"
+  description="Reusable requests that define which credentials and claims a wallet must present."
+>
+  <a hlmBtn routerLink="create">
+    <ng-icon name="lucidePlus" aria-hidden="true" />
+    Create configuration
+  </a>
+</app-page-header>
+
+<section
+  class="bg-card overflow-hidden rounded-2xl shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+  aria-label="Presentation configurations"
+>
+  <div class="border-b px-4 py-3.5 sm:px-5">
+    <hlm-input-group class="h-9 w-full rounded-lg sm:max-w-96">
+      <hlm-input-group-addon>
+        <ng-icon name="lucideSearch" aria-hidden="true" />
+      </hlm-input-group-addon>
+      <input
+        hlmInputGroupInput
+        type="search"
+        aria-label="Search presentation configurations"
+        placeholder="Search by ID or description"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
+      />
+      @if (search()) {
+      <button hlmInputGroupButton type="button" aria-label="Clear search" (click)="search.set('')">
+        <ng-icon name="lucideX" aria-hidden="true" />
+      </button>
+      }
+    </hlm-input-group>
+  </div>
+
+  @if (configs.isPending()) {
+  <div class="grid gap-3 p-5" aria-label="Loading presentation configurations" role="status">
+    @for (row of [1, 2, 3]; track row) {
+    <hlm-skeleton class="h-14 w-full rounded-xl" />
+    }
+  </div>
+  } @else if (configs.isError()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center" role="alert">
+    <span
+      class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideTriangleAlert" class="text-xl" />
+    </span>
+    <p class="font-semibold">Presentation configurations could not be loaded</p>
+    <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(configs.error()) }}</p>
+    <button hlmBtn variant="outline" type="button" (click)="configs.refetch()">Retry</button>
+  </div>
+  } @else if (!configs.data()?.length) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <span class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl">
+      <ng-icon name="lucideBadgeCheck" class="text-xl" aria-hidden="true" />
+    </span>
+    <p class="font-semibold">No presentation configurations yet</p>
+    <p class="text-muted-foreground max-w-sm text-sm">
+      Create a reusable request to define the credentials and claims wallets should present.
+    </p>
+    <a hlmBtn routerLink="create">
+      <ng-icon name="lucidePlus" aria-hidden="true" />
+      Create configuration
+    </a>
+  </div>
+  } @else if (!filtered().length) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <p class="font-semibold">No configuration matches “{{ search() }}”</p>
+    <button hlmBtn variant="outline" type="button" (click)="search.set('')">
+      <ng-icon name="lucideX" aria-hidden="true" />
+      Clear search
+    </button>
+  </div>
+  } @else {
+  <div hlmTableContainer>
+    <table hlmTable class="table-fixed">
+      <thead hlmTHead class="bg-muted/40">
+        <tr hlmTr class="hover:bg-transparent">
+          <th hlmTh scope="col" class="text-muted-foreground ps-4 sm:ps-5">Configuration</th>
+          <th hlmTh scope="col" class="text-muted-foreground hidden px-3 md:table-cell">Created</th>
+          <th hlmTh scope="col" class="text-muted-foreground hidden w-40 px-3 sm:table-cell">
+            Registration certificate
+          </th>
+          <th hlmTh scope="col" class="w-28 pe-3 sm:pe-5"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody hlmTBody>
+        @for (config of filtered(); track config.id) { @let status = registrationStatus(config);
+        @let state = registrationStatusLabel[status]; @let locked = lockReason(config);
+        <tr hlmTr class="hover:bg-muted/40">
+          <td hlmTd class="py-3 ps-4 sm:ps-5">
+            <div class="flex min-w-0 items-center gap-3">
+              <span
+                class="bg-accent text-accent-foreground grid size-9 shrink-0 place-items-center rounded-xl"
+              >
+                <ng-icon name="lucideBadgeCheck" aria-hidden="true" />
+              </span>
+              <span class="min-w-0">
+                <a [routerLink]="config.id" class="block truncate font-semibold hover:underline">
+                  {{ config.id }}
+                </a>
+                <span class="text-muted-foreground block truncate text-xs">
+                  {{ config.description || 'No description' }}
+                </span>
+                @if (locked) {
+                <span
+                  class="bg-muted mt-1 inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium"
+                  [hlmTooltip]="locked"
+                >
+                  <ng-icon name="lucideLock" aria-hidden="true" />
+                  Managed by a file
+                </span>
+                }
+              </span>
+            </div>
+          </td>
+          <td hlmTd class="text-muted-foreground hidden px-3 py-3 text-sm md:table-cell">
+            {{ config.createdAt | date: 'mediumDate' }}
+          </td>
+          <td hlmTd class="hidden px-3 py-3 sm:table-cell">
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium {{ state.tone }}"
+            >
+              <ng-icon [name]="state.icon" aria-hidden="true" />
+              {{ state.label }}
+            </span>
+          </td>
+          <td hlmTd class="py-3 pe-3 sm:pe-5">
+            <div class="flex justify-end gap-1">
+              @if (locked) {
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                aria-disabled="true"
+                [attr.aria-label]="'Edit ' + config.id"
+                [hlmTooltip]="locked"
+              >
+                <ng-icon name="lucidePencil" />
+              </button>
+              } @else {
+              <a
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                [routerLink]="[config.id, 'edit']"
+                [attr.aria-label]="'Edit ' + config.id"
+                hlmTooltip="Edit"
+              >
+                <ng-icon name="lucidePencil" />
+              </a>
+              }
+              <a
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                [routerLink]="config.id"
+                [attr.aria-label]="'Open ' + config.id"
+                hlmTooltip="Open"
+              >
+                <ng-icon name="lucideChevronRight" />
+              </a>
+            </div>
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</section>

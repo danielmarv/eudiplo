@@ -1,0 +1,470 @@
+<app-page-header
+  heading="Sessions"
+  description="Review issuance offers and presentation requests, and manage sessions you can change."
+>
+  @if (canOfferIssuance()) {
+  <a hlmBtn routerLink="/offer/issuance">
+    <ng-icon name="lucidePlus" aria-hidden="true" />
+    Issuance offer
+  </a>
+  } @if (canRequestPresentation()) {
+  <a hlmBtn variant="outline" routerLink="/offer/presentation">
+    <ng-icon name="lucidePlus" aria-hidden="true" />
+    Presentation request
+  </a>
+  } @if (hasRole('issuance:manage') || hasRole('presentation:manage')) {
+  <a hlmBtn variant="outline" routerLink="/session-management/config">
+    <ng-icon name="lucideSettings2" aria-hidden="true" />
+    Settings
+  </a>
+  }
+</app-page-header>
+
+@if (hidesOpenSessions()) {
+<p class="bg-primary/5 text-muted-foreground mb-4 rounded-lg px-4 py-3 text-sm">
+  Offers and requests that a wallet can still use are listed only for session types you create or
+  manage. Dashboard counts include them.
+</p>
+}
+
+<section class="bg-card overflow-visible rounded-2xl border shadow-sm" aria-label="Sessions">
+  <form [formGroup]="filters" class="relative z-10 space-y-4 border-b p-4 sm:p-5">
+    <div class="grid gap-3 lg:grid-cols-[minmax(16rem,2fr)_repeat(3,minmax(9rem,1fr))]">
+      <div class="relative">
+        <ng-icon
+          name="lucideSearch"
+          class="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2"
+          aria-hidden="true"
+        />
+        <input
+          hlmInput
+          type="search"
+          formControlName="q"
+          aria-label="Search sessions"
+          placeholder="Session ID, reference, wallet code, offer or request link"
+          class="pl-9"
+        />
+      </div>
+      <select
+        formControlName="type"
+        aria-label="Session type"
+        class="border-input bg-background h-10 rounded-md border px-3 text-sm"
+      >
+        <option value="">All session types</option>
+        <option value="issuance">Issuance</option>
+        <option value="presentation">Presentation</option>
+      </select>
+      <details #statusDropdown class="relative min-w-0">
+        <summary
+          [attr.aria-label]="'Filter sessions by status: ' + selectedStatusLabel()"
+          class="border-input bg-background hover:bg-muted/40 focus-visible:ring-ring flex h-10 list-none cursor-pointer select-none items-center justify-between gap-2 rounded-md border px-3 text-sm transition-colors focus-visible:ring-2 focus-visible:outline-none [&::-webkit-details-marker]:hidden"
+        >
+          <span class="truncate">{{ selectedStatusLabel() }}</span>
+          <ng-icon
+            name="lucideChevronDown"
+            class="text-muted-foreground size-4 shrink-0"
+            aria-hidden="true"
+          />
+        </summary>
+        <div
+          role="group"
+          aria-label="Session statuses"
+          class="bg-popover absolute top-full z-30 mt-1 max-h-64 w-full min-w-40 overflow-auto rounded-md border p-1 shadow-lg"
+        >
+          @for (status of statuses; track status.value) {
+          <label
+            class="hover:bg-muted flex cursor-pointer items-center gap-2 rounded-sm px-2 py-1.5 text-sm"
+          >
+            <input
+              type="checkbox"
+              class="accent-primary size-4 shrink-0"
+              [value]="status.value"
+              [checked]="filters.controls.status.value.includes(status.value)"
+              (change)="toggleStatus(status.value, $event)"
+            />
+            {{ status.label }}
+          </label>
+          }
+        </div>
+      </details>
+      <div class="flex flex-wrap gap-2">
+        <button
+          hlmBtn
+          variant="outline"
+          type="button"
+          [attr.aria-disabled]="isPendingSelected()"
+          (click)="showPending()"
+        >
+          <ng-icon name="lucideActivity" aria-hidden="true" />
+          Pending
+        </button>
+        <button
+          hlmBtn
+          variant="ghost"
+          type="button"
+          aria-label="Refresh sessions"
+          (click)="refreshSessions()"
+        >
+          <ng-icon name="lucideRefreshCw" aria-hidden="true" />
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div class="space-y-1">
+        <label for="session-config" class="text-muted-foreground text-xs font-medium">
+          Configuration
+        </label>
+        <input
+          id="session-config"
+          hlmInput
+          type="text"
+          formControlName="config"
+          list="session-config-options"
+          placeholder="All configurations"
+        />
+        <datalist id="session-config-options">
+          @for (option of configSuggestions(); track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+          }
+        </datalist>
+      </div>
+      <div class="space-y-1">
+        <label for="created-from" class="text-muted-foreground text-xs font-medium"
+          >Created from</label
+        >
+        <input id="created-from" hlmInput type="date" formControlName="createdFrom" />
+      </div>
+      <div class="space-y-1">
+        <label for="created-to" class="text-muted-foreground text-xs font-medium">Created to</label>
+        <input id="created-to" hlmInput type="date" formControlName="createdTo" />
+      </div>
+      <div class="space-y-1">
+        <label for="updated-filter" class="text-muted-foreground text-xs font-medium"
+          >Updated</label
+        >
+        <select
+          id="updated-filter"
+          formControlName="updated"
+          class="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
+        >
+          <option value="">Any time</option>
+          @for (option of updatedOptions; track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+          }
+          <option value="custom">Custom range</option>
+        </select>
+      </div>
+      <div class="space-y-1">
+        <label for="failure-code" class="text-muted-foreground text-xs font-medium">
+          Failure code
+        </label>
+        <input
+          id="failure-code"
+          hlmInput
+          type="text"
+          formControlName="failureCode"
+          list="session-failure-codes"
+          placeholder="Any failure code"
+        />
+        <datalist id="session-failure-codes">
+          @for (code of failureCodes; track code) {
+          <option [value]="code"></option>
+          }
+        </datalist>
+      </div>
+    </div>
+
+    @if (filters.controls.updated.value === 'custom') {
+    <div class="grid max-w-xl gap-3 sm:grid-cols-2">
+      <div class="space-y-1">
+        <label for="updated-from" class="text-muted-foreground text-xs font-medium">
+          Updated from
+        </label>
+        <input id="updated-from" hlmInput type="date" formControlName="updatedFrom" />
+      </div>
+      <div class="space-y-1">
+        <label for="updated-to" class="text-muted-foreground text-xs font-medium">
+          Updated to
+        </label>
+        <input id="updated-to" hlmInput type="date" formControlName="updatedTo" />
+      </div>
+    </div>
+    } @if (filterError()) {
+    <p class="text-destructive text-sm" role="alert">{{ filterError() }}</p>
+    } @if (configOptionsError()) {
+    <p class="text-muted-foreground text-sm" role="status">
+      Configuration suggestions could not be loaded. You can still enter an ID as
+      <code>issuance:id</code> or <code>presentation:id</code>.
+    </p>
+    }
+    <div class="flex flex-wrap items-center gap-2">
+      @if (hasActiveFilters()) {
+      <button hlmBtn variant="ghost" type="button" (click)="clearFilters()">
+        <ng-icon name="lucideFilterX" aria-hidden="true" />
+        Clear filters
+      </button>
+      } @if (selectedIds().length) {
+      <span class="text-muted-foreground ml-auto text-sm">
+        {{ selectedIds().length }} selected on this page
+      </span>
+      @if (cancelDisabledHint()) {
+      <span id="cancel-action-hint" class="text-muted-foreground text-sm">
+        {{ cancelDisabledHint() }}
+      </span>
+      }
+      <button
+        hlmBtn
+        variant="outline"
+        type="button"
+        [attr.aria-disabled]="!!cancelDisabledHint() || !cancellableSelected().length"
+        [attr.aria-describedby]="cancelDisabledHint() ? 'cancel-action-hint' : null"
+        (click)="openCancelDialog()"
+      >
+        <ng-icon name="lucideCircleX" aria-hidden="true" />
+        Cancel selected
+      </button>
+      <button
+        hlmBtn
+        variant="destructive"
+        type="button"
+        [attr.aria-disabled]="actionBusy()"
+        (click)="openDeleteDialog()"
+      >
+        <ng-icon name="lucideTrash2" aria-hidden="true" />
+        Delete selected
+      </button>
+      <button
+        hlmBtn
+        variant="ghost"
+        type="button"
+        [attr.aria-disabled]="actionBusy()"
+        (click)="clearSelection()"
+        aria-label="Clear session selection"
+      >
+        <ng-icon name="lucideX" aria-hidden="true" />
+        Clear selection
+      </button>
+      }
+    </div>
+  </form>
+
+  @if (sessions.isPending()) {
+  <div class="grid gap-3 p-5" aria-label="Loading sessions" role="status">
+    @for (row of [1, 2, 3, 4]; track row) {
+    <hlm-skeleton class="h-12 w-full rounded-lg" />
+    }
+  </div>
+  } @else if (sessions.isError()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center" role="alert">
+    <span class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl">
+      <ng-icon name="lucideTriangleAlert" aria-hidden="true" />
+    </span>
+    <p class="font-semibold">Sessions could not be loaded</p>
+    <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(sessions.error()) }}</p>
+    <button hlmBtn variant="outline" type="button" (click)="refreshSessions()">Retry</button>
+  </div>
+  } @else if (!total()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <span class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl">
+      <ng-icon name="lucideActivity" aria-hidden="true" />
+    </span>
+    <p class="font-semibold">No sessions found</p>
+    <p class="text-muted-foreground max-w-md text-sm">
+      @if (hasActiveFilters()) { Try adjusting or clearing the filters. } @else { Sessions will
+      appear here when an issuance offer or presentation request is created. }
+    </p>
+  </div>
+  } @else { @if (hasReadOnlyRows()) {
+  <p class="text-muted-foreground border-b px-4 py-3 text-sm" role="note">
+    Some sessions are read-only with your roles. Only sessions you can change can be selected.
+  </p>
+  }
+  <div hlmTableContainer>
+    <table hlmTable class="table-fixed">
+      <thead hlmTHead class="bg-muted/40">
+        <tr hlmTr class="hover:bg-transparent">
+          <th hlmTh scope="col" class="w-12 px-3">
+            <input
+              type="checkbox"
+              aria-label="Select all changeable sessions on this page"
+              [checked]="allChangeableSelected()"
+              [indeterminate]="someChangeableSelected() && !allChangeableSelected()"
+              [disabled]="!changeableRows().length"
+              (change)="toggleAll($any($event.target).checked)"
+            />
+          </th>
+          <th hlmTh scope="col" class="ps-3 sm:w-[26%]" [attr.aria-sort]="ariaSort(column('id'))">
+            <app-sort-toggle [column]="column('id')">Session ID</app-sort-toggle>
+          </th>
+          <th
+            hlmTh
+            scope="col"
+            class="hidden px-3 sm:table-cell"
+            [attr.aria-sort]="ariaSort(column('type'))"
+          >
+            <app-sort-toggle [column]="column('type')">Type</app-sort-toggle>
+          </th>
+          <th hlmTh scope="col" class="px-3" [attr.aria-sort]="ariaSort(column('status'))">
+            <app-sort-toggle [column]="column('status')">Status</app-sort-toggle>
+          </th>
+          <th hlmTh scope="col" class="hidden px-3 md:table-cell">Reference</th>
+          <th
+            hlmTh
+            scope="col"
+            class="hidden px-3 lg:table-cell"
+            [attr.aria-sort]="ariaSort(column('createdAt'))"
+          >
+            <app-sort-toggle [column]="column('createdAt')">Created</app-sort-toggle>
+          </th>
+          <th hlmTh scope="col" class="px-3" [attr.aria-sort]="ariaSort(column('updatedAt'))">
+            <app-sort-toggle [column]="column('updatedAt')">Updated</app-sort-toggle>
+          </th>
+        </tr>
+      </thead>
+      <tbody hlmTBody>
+        @for (session of table.getRowModel().rows; track session.id) {
+        <tr hlmTr>
+          <td hlmTd class="px-3">
+            <input
+              type="checkbox"
+              [attr.aria-label]="
+                    canChange(session.original)
+                      ? 'Select session ' + session.id
+                      : 'Cannot change session ' + session.id + ' with your roles'
+                  "
+              [checked]="selectedIds().includes(session.id)"
+              [disabled]="!canChange(session.original)"
+              (change)="toggleRow(session.original, $any($event.target).checked)"
+            />
+          </td>
+          <td hlmTd class="max-w-0 ps-3">
+            <span class="font-mono text-xs [overflow-wrap:anywhere]">{{ session.id }}</span>
+          </td>
+          <td hlmTd class="hidden px-3 sm:table-cell">
+            <span class="rounded-full border px-2.5 py-1 text-xs">
+              {{ isPresentationSession(session.original) ? 'Presentation' : 'Issuance' }}
+            </span>
+          </td>
+          <td hlmTd class="px-3">
+            <span
+              class="rounded-full border px-2.5 py-1 text-xs capitalize"
+              [title]="session.original.failureCode ?? ''"
+            >
+              {{ session.original.status }}
+            </span>
+            @if (session.original.failureCode) {
+            <span class="text-muted-foreground mt-1 block max-w-36 truncate font-mono text-xs">
+              {{ session.original.failureCode }}
+            </span>
+            }
+          </td>
+          <td hlmTd class="text-muted-foreground hidden max-w-48 truncate px-3 md:table-cell">
+            {{ session.original.reference || '—' }}
+          </td>
+          <td hlmTd class="text-muted-foreground hidden px-3 text-xs lg:table-cell">
+            {{ dateTime(session.original.createdAt) }}
+          </td>
+          <td hlmTd class="text-muted-foreground px-3 text-xs">
+            {{ dateTime(session.original.updatedAt) }}
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <app-table-pagination
+    [table]="table"
+    [totalRecords]="total()"
+    [sizes]="pageSizes"
+    singular="session"
+    plural="sessions"
+  />
+  }
+</section>
+
+<hlm-alert-dialog
+  [state]="confirmingCancel() ? 'open' : 'closed'"
+  (stateChanged)="onCancelDialog($event)"
+>
+  <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+    <hlm-alert-dialog-header>
+      <h2 hlmAlertDialogTitle>Cancel {{ cancellableSelected().length }} pending sessions?</h2>
+      <p hlmAlertDialogDescription>
+        A wallet will no longer be able to use these offers or requests. A session redeemed in the
+        meantime will not be cancelled.
+      </p>
+      <ul class="max-h-24 space-y-1 overflow-y-auto rounded-md border p-2 text-xs">
+        @for (session of cancellableSelected(); track session.id) {
+        <li class="font-mono [overflow-wrap:anywhere]">{{ session.id }}</li>
+        }
+      </ul>
+    </hlm-alert-dialog-header>
+    <form [formGroup]="cancelForm" (ngSubmit)="cancelSelected()" class="space-y-3">
+      <label for="cancel-reason" class="text-sm font-medium">Reason (optional)</label>
+      <textarea
+        id="cancel-reason"
+        hlmInput
+        formControlName="reason"
+        maxlength="500"
+        rows="3"
+        placeholder="Reason shown in the audit log"
+      ></textarea>
+      <p class="text-muted-foreground text-xs">
+        {{ cancelForm.controls.reason.value.length }}/500 characters
+      </p>
+      <hlm-alert-dialog-footer>
+        <button
+          hlmAlertDialogCancel
+          type="button"
+          [disabled]="actionBusy()"
+          (click)="closeCancelDialog(); ctx.close()"
+        >
+          Keep sessions
+        </button>
+        <button hlmAlertDialogAction variant="destructive" type="submit" [disabled]="actionBusy()">
+          @if (actionBusy()) {
+          <hlm-spinner class="size-4" aria-hidden="true" />
+          Cancelling… } @else { Cancel sessions }
+        </button>
+      </hlm-alert-dialog-footer>
+    </form>
+  </hlm-alert-dialog-content>
+</hlm-alert-dialog>
+
+<hlm-alert-dialog
+  [state]="confirmingDelete() ? 'open' : 'closed'"
+  (stateChanged)="onDeleteDialog($event)"
+>
+  <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+    <hlm-alert-dialog-header>
+      <h2 hlmAlertDialogTitle>Delete {{ selectedSessions().length }} sessions?</h2>
+      <p hlmAlertDialogDescription>
+        Deletion cannot be undone. Credentials issued in these sessions keep their credential
+        status.
+      </p>
+      <ul class="max-h-24 space-y-1 overflow-y-auto rounded-md border p-2 text-xs">
+        @for (session of selectedSessions(); track session.id) {
+        <li class="font-mono [overflow-wrap:anywhere]">{{ session.id }}</li>
+        }
+      </ul>
+    </hlm-alert-dialog-header>
+    <hlm-alert-dialog-footer>
+      <button hlmAlertDialogCancel type="button" [disabled]="actionBusy()" (click)="ctx.close()">
+        Keep sessions
+      </button>
+      <button
+        hlmAlertDialogAction
+        variant="destructive"
+        type="button"
+        [disabled]="actionBusy()"
+        (click)="deleteSelected()"
+      >
+        @if (actionBusy()) {
+        <hlm-spinner class="size-4" aria-hidden="true" />
+        Deleting… } @else { Delete sessions }
+      </button>
+    </hlm-alert-dialog-footer>
+  </hlm-alert-dialog-content>
+</hlm-alert-dialog>

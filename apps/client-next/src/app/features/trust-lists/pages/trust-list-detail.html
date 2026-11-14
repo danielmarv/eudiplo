@@ -1,0 +1,442 @@
+@if (list.isPending()) {
+<div role="status" aria-label="Loading trust list" class="grid max-w-5xl gap-5">
+  <hlm-skeleton class="h-10 w-72 rounded-lg" />
+  <hlm-skeleton class="h-56 w-full rounded-2xl" />
+  <hlm-skeleton class="h-64 w-full rounded-2xl" />
+</div>
+} @else if (list.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  @if (notFound(list.error())) {
+  <h1 class="text-lg font-semibold">There is no trust list {{ id() }}</h1>
+  <p class="text-muted-foreground max-w-md text-sm">
+    It may have been deleted, or the address has a typo.
+  </p>
+  <a hlmBtn variant="outline" routerLink="/trust-list">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    All trust lists
+  </a>
+  } @else {
+  <h1 class="text-lg font-semibold">The trust list could not be loaded</h1>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(list.error()) }}</p>
+  <div class="flex flex-wrap justify-center gap-2">
+    <button hlmBtn variant="outline" type="button" (click)="list.refetch()">Retry</button>
+    <a hlmBtn variant="ghost" routerLink="/trust-list">All trust lists</a>
+  </div>
+  }
+</section>
+} @else if (list.data(); as current) {
+<app-ownership-notice class="mb-5 block empty:hidden" kind="TrustList" [resource]="owner()" />
+
+<app-page-header
+  [heading]="current.description || current.id"
+  [description]="'Trust list details · ' + current.id"
+>
+  <a hlmBtn variant="ghost" routerLink="/trust-list">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    All trust lists
+  </a>
+  @if (canDownload()) {
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    [attr.aria-disabled]="configDownloading() || null"
+    [attr.aria-busy]="configDownloading() || null"
+    hlmTooltip="Download configuration"
+    (click)="download()"
+  >
+    @if (configDownloading()) {
+    <hlm-spinner class="size-4" aria-hidden="true" />
+    } @else {
+    <ng-icon name="lucideDownload" aria-hidden="true" />
+    } Download config
+  </button>
+  } @if (locked()) {
+  <button hlmBtn variant="outline" type="button" aria-disabled="true" [hlmTooltip]="locked()">
+    <ng-icon name="lucideLock" aria-hidden="true" />
+    Edit
+  </button>
+  } @else {
+  <a hlmBtn variant="outline" routerLink="edit">
+    <ng-icon name="lucidePencil" aria-hidden="true" />
+    Edit
+  </a>
+  } @if (locked()) {
+  <button hlmBtn variant="outline" type="button" aria-disabled="true" [hlmTooltip]="locked()">
+    <ng-icon name="lucideLock" aria-hidden="true" />
+    Delete
+  </button>
+  } @else { @if (referenceBlockReason(); as blocked) {
+  <span id="delete-blocked" class="sr-only">{{ blocked }}</span>
+  }
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    class="hover:border-destructive/40 hover:text-destructive"
+    [attr.aria-disabled]="referenceBlockReason() || deleting() ? 'true' : null"
+    [attr.aria-describedby]="referenceBlockReason() ? 'delete-blocked' : null"
+    [hlmTooltip]="referenceBlockReason() || (deleting() ? 'Deleting the trust list…' : 'Delete list')"
+    (click)="deleteTrustList()"
+  >
+    <ng-icon name="lucideTrash2" aria-hidden="true" />
+    {{ deleting() ? 'Deleting…' : 'Delete' }}
+  </button>
+  }
+</app-page-header>
+
+<div class="grid max-w-5xl gap-5">
+  <section class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div class="flex items-start gap-3">
+      <span
+        class="bg-accent text-accent-foreground grid size-10 shrink-0 place-items-center rounded-xl"
+      >
+        <ng-icon name="lucideShieldCheck" aria-hidden="true" />
+      </span>
+      <div>
+        <h2 class="font-heading text-xl font-semibold">Trust list overview</h2>
+        <p class="text-muted-foreground text-sm">
+          Signed list published for wallets and verifiers.
+        </p>
+      </div>
+    </div>
+    <dl class="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+      <div>
+        <dt class="text-muted-foreground text-xs">ID</dt>
+        <dd class="font-mono break-all">{{ current.id }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Version</dt>
+        <dd>{{ current.sequenceNumber }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Signing key chain</dt>
+        <dd class="font-mono break-all">{{ current.keyChainId }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Trusted entities</dt>
+        <dd>{{ trustedEntitiesCount(current) }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Created</dt>
+        <dd>{{ current.createdAt | date: 'medium' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Last updated</dt>
+        <dd>{{ current.updatedAt | date: 'medium' }}</dd>
+      </div>
+    </dl>
+    @if (publicUrl()) {
+    <div class="border-t pt-4">
+      <h3 class="font-medium">Public URL</h3>
+      <p class="text-muted-foreground mt-1 text-sm">
+        Wallets and verifiers fetch the signed list at this address.
+      </p>
+      <div class="mt-2 flex min-w-0 items-center gap-2 rounded-lg border px-3 py-2">
+        <code class="min-w-0 flex-1 break-all text-xs">{{ publicUrl() }}</code>
+        <button
+          type="button"
+          class="text-muted-foreground hover:text-foreground grid size-8 shrink-0 place-items-center rounded-md"
+          aria-label="Copy trust list URL"
+          hlmTooltip="Copy URL"
+          (click)="copyUrl()"
+        >
+          <ng-icon name="lucideCopy" aria-hidden="true" />
+        </button>
+      </div>
+      @if (publicUrlIsInstanceUrl()) {
+      <p class="text-muted-foreground mt-2 text-sm" role="status">
+        The backend did not report its public URL, so this uses the instance address you signed in
+        with. Wallets and verifiers may not be able to reach it.
+      </p>
+      }
+      <p class="text-muted-foreground mt-2 text-xs">
+        For instance-independent references, use
+        <code>&lt;TENANT_URL&gt;/trust-list/{{ current.id }}</code>.
+      </p>
+    </div>
+    }
+  </section>
+
+  <section class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div>
+      <h2 class="font-heading text-xl font-semibold">Trusted entities</h2>
+      <p class="text-muted-foreground mt-1 text-sm">
+        Certificates and issuer information published in this trust list.
+      </p>
+    </div>
+    @if (entities().length) {
+    <div class="grid gap-3">
+      @for (entity of entities(); track $index) {
+      <details class="rounded-xl border p-4">
+        <summary class="cursor-pointer font-medium">
+          {{ entity.info?.name || 'Published entity' }}
+          <span class="text-muted-foreground ms-2 text-xs font-normal">{{ entity.type }}</span>
+        </summary>
+        @if (entity.info; as info) {
+        <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+          @if (info.lang) {
+          <div>
+            <dt class="text-muted-foreground text-xs">Language</dt>
+            <dd>{{ info.lang }}</dd>
+          </div>
+          } @if (info.country) {
+          <div>
+            <dt class="text-muted-foreground text-xs">Country</dt>
+            <dd>{{ info.country }}</dd>
+          </div>
+          } @if (info.locality) {
+          <div>
+            <dt class="text-muted-foreground text-xs">Locality</dt>
+            <dd>{{ info.locality }}</dd>
+          </div>
+          } @if (info.postalCode) {
+          <div>
+            <dt class="text-muted-foreground text-xs">Postal code</dt>
+            <dd>{{ info.postalCode }}</dd>
+          </div>
+          } @if (info.streetAddress) {
+          <div>
+            <dt class="text-muted-foreground text-xs">Street address</dt>
+            <dd>{{ info.streetAddress }}</dd>
+          </div>
+          } @if (info.uri) {
+          <div class="break-all">
+            <dt class="text-muted-foreground text-xs">Information URI</dt>
+            <dd>
+              <a [href]="info.uri" target="_blank" rel="noopener" class="text-primary underline"
+                >{{ info.uri }}</a
+              >
+            </dd>
+          </div>
+          } @if (info.contactUri) {
+          <div class="break-all">
+            <dt class="text-muted-foreground text-xs">E-mail address</dt>
+            <dd>
+              @if (isEmail(info.contactUri)) {
+              <a [href]="mailtoUri(info.contactUri)" class="text-primary underline"
+                >{{ info.contactUri }}</a
+              >
+              } @else { {{ info.contactUri }} (not an e-mail address; edit the trust list to fix it)
+              }
+            </dd>
+          </div>
+          } @if (info.website) {
+          <div class="break-all">
+            <dt class="text-muted-foreground text-xs">Website</dt>
+            <dd>
+              <a [href]="info.website" target="_blank" rel="noopener" class="text-primary underline"
+                >{{ info.website }}</a
+              >
+            </dd>
+          </div>
+          } @if (info.phone) {
+          <div>
+            <dt class="text-muted-foreground text-xs">Telephone</dt>
+            <dd>{{ info.phone }}</dd>
+          </div>
+          }
+        </dl>
+        } @if (entity.type === 'internal') {
+        <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <dt class="text-muted-foreground text-xs">Issuer key chain</dt>
+            <dd class="font-mono break-all">{{ entity.issuerKeyChainId }}</dd>
+          </div>
+          <div>
+            <dt class="text-muted-foreground text-xs">Revocation key chain</dt>
+            <dd class="font-mono break-all">{{ entity.revocationKeyChainId }}</dd>
+          </div>
+        </dl>
+        } @else if (entity.type === 'external') {
+        <div class="mt-4 grid gap-3">
+          @if (entity.issuerCertPem) {
+          <details>
+            <summary class="cursor-pointer text-sm font-medium">Issuer certificate (PEM)</summary>
+            <pre class="bg-muted mt-2 overflow-auto rounded-lg p-3 font-mono text-xs">
+{{ entity.issuerCertPem }}</pre>
+          </details>
+          } @if (entity.revocationCertPem) {
+          <details>
+            <summary class="cursor-pointer text-sm font-medium">
+              Revocation certificate (PEM)
+            </summary>
+            <pre class="bg-muted mt-2 overflow-auto rounded-lg p-3 font-mono text-xs">
+{{ entity.revocationCertPem }}</pre>
+          </details>
+          }
+        </div>
+        } @else {
+        <pre class="bg-muted mt-3 overflow-auto rounded-lg p-3 font-mono text-xs">
+{{ entity.publishedData | json }}</pre>
+        }
+      </details>
+      }
+    </div>
+    } @else {
+    <p class="text-muted-foreground rounded-xl border border-dashed p-5 text-sm">
+      No entity configuration is available for this trust list.
+    </p>
+    }
+  </section>
+
+  <section class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div class="flex items-start gap-3">
+      <span class="bg-primary/8 text-primary grid size-10 shrink-0 place-items-center rounded-xl">
+        <ng-icon name="lucideExternalLink" aria-hidden="true" />
+      </span>
+      <div>
+        <h2 class="font-heading text-xl font-semibold">Referenced by credential configurations</h2>
+        @if (!canReadCredentialConfigs()) {
+        <p class="text-muted-foreground mt-1 text-sm">
+          The issuance:manage role is required to see which credential configurations reference this
+          list.
+        </p>
+        } @else if (credentialConfigs.isPending()) {
+        <p class="text-muted-foreground mt-1 text-sm" role="status">
+          Loading credential configurations…
+        </p>
+        } @else if (credentialConfigs.isError()) {
+        <p class="text-muted-foreground mt-1 text-sm" role="alert">
+          Credential configurations could not be loaded.
+          <button
+            hlmBtn
+            variant="link"
+            size="sm"
+            type="button"
+            class="h-auto p-0"
+            (click)="credentialConfigs.refetch()"
+          >
+            Retry
+          </button>
+        </p>
+        } @else if (relatedCredentials().length) {
+        <ul class="mt-3 grid gap-2 sm:grid-cols-2">
+          @for (config of relatedCredentials(); track config.id) {
+          <li>
+            <a hlmBtn variant="outline" [routerLink]="['/credential-config', config.id]"
+              >{{ config.description || config.id }}
+              <ng-icon name="lucideExternalLink" aria-hidden="true"
+            /></a>
+          </li>
+          }
+        </ul>
+        } @else {
+        <p class="text-muted-foreground mt-1 text-sm">
+          No credential configurations reference this trust list.
+        </p>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div class="flex items-start gap-3">
+      <span
+        class="bg-accent text-accent-foreground grid size-10 shrink-0 place-items-center rounded-xl"
+      >
+        <ng-icon name="lucideExternalLink" aria-hidden="true" />
+      </span>
+      <div>
+        <h2 class="font-heading text-xl font-semibold">
+          Referenced by presentation configurations
+        </h2>
+        @if (!canReadPresentationConfigs()) {
+        <p class="text-muted-foreground mt-1 text-sm">
+          The presentation:manage or presentation:request role is required to see which presentation
+          configurations reference this list.
+        </p>
+        } @else if (presentationConfigs.isPending()) {
+        <p class="text-muted-foreground mt-1 text-sm" role="status">
+          Loading presentation configurations…
+        </p>
+        } @else if (presentationConfigs.isError()) {
+        <p class="text-muted-foreground mt-1 text-sm" role="alert">
+          Presentation configurations could not be loaded.
+          <button
+            hlmBtn
+            variant="link"
+            size="sm"
+            type="button"
+            class="h-auto p-0"
+            (click)="presentationConfigs.refetch()"
+          >
+            Retry
+          </button>
+        </p>
+        } @else if (relatedPresentations().length) {
+        <ul class="mt-3 grid gap-2 sm:grid-cols-2">
+          @for (config of relatedPresentations(); track config.id) {
+          <li>
+            <a hlmBtn variant="outline" [routerLink]="['/presentation-config', config.id]"
+              >{{ config.description || config.id }}
+              <ng-icon name="lucideExternalLink" aria-hidden="true"
+            /></a>
+          </li>
+          }
+        </ul>
+        } @else {
+        <p class="text-muted-foreground mt-1 text-sm">
+          No presentation configurations reference this trust list.
+        </p>
+        }
+      </div>
+    </div>
+  </section>
+
+  <section class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div class="flex items-start gap-3">
+      <span
+        class="bg-muted text-muted-foreground grid size-10 shrink-0 place-items-center rounded-xl"
+      >
+        <ng-icon name="lucideHistory" aria-hidden="true" />
+      </span>
+      <div>
+        <h2 class="font-heading text-xl font-semibold">Version history</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          Previously published revisions of this list.
+        </p>
+      </div>
+    </div>
+    @if (versions.isPending()) {
+    <p class="text-muted-foreground text-sm" role="status">Loading version history…</p>
+    } @else if (versions.isError()) {
+    <p class="text-muted-foreground text-sm" role="alert">
+      Version history could not be loaded.
+      <button
+        hlmBtn
+        variant="link"
+        size="sm"
+        type="button"
+        class="h-auto p-0"
+        (click)="versions.refetch()"
+      >
+        Retry
+      </button>
+    </p>
+    } @else if (versions.data()?.length) {
+    <ol class="grid gap-2">
+      @for (version of versions.data(); track version.id) {
+      <li
+        class="flex flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm"
+      >
+        <span class="font-medium">{{ versionLabel(version) }}</span>
+        <time class="text-muted-foreground">{{ version.createdAt | date: 'medium' }}</time>
+      </li>
+      }
+    </ol>
+    } @else {
+    <p class="text-muted-foreground text-sm">No previous versions are available.</p>
+    }
+  </section>
+</div>
+}

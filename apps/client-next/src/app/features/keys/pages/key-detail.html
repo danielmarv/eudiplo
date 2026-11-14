@@ -1,0 +1,403 @@
+@if (key.isPending()) {
+<div class="grid gap-3" role="status" aria-label="Loading key chain">
+  <hlm-skeleton class="h-20 rounded-xl" />
+  <hlm-skeleton class="h-56 rounded-2xl" />
+  <hlm-skeleton class="h-56 rounded-2xl" />
+</div>
+} @else if (key.isError()) {
+<section
+  class="grid justify-items-center gap-3 rounded-2xl bg-card px-6 py-14 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <ng-icon name="lucideTriangleAlert" class="text-destructive text-xl" aria-hidden="true" />
+  <p class="font-semibold">The key chain could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(key.error()) }}</p>
+  <button hlmBtn variant="outline" type="button" (click)="retry()">Retry</button>
+  <a hlmBtn variant="ghost" routerLink="/keys"
+    ><ng-icon name="lucideArrowLeft" aria-hidden="true" />Back to keys</a
+  >
+</section>
+} @else if (key.data(); as item) {
+<app-ownership-notice
+  class="mb-6 block empty:hidden"
+  kind="KeyChain"
+  [resource]="ownershipResource()"
+/>
+<app-page-header [heading]="keyName(item)" [description]="'Key chain: ' + item.id">
+  <a hlmBtn variant="ghost" routerLink="/keys"
+    ><ng-icon name="lucideArrowLeft" aria-hidden="true" />Keys</a
+  >
+  @if (lock()) {
+  <button hlmBtn variant="outline" type="button" aria-disabled="true" [hlmTooltip]="lock()">
+    <ng-icon name="lucideLock" aria-hidden="true" />Edit
+  </button>
+  } @else {
+  <a hlmBtn variant="outline" [routerLink]="[item.id, 'edit']"
+    ><ng-icon name="lucideEdit" aria-hidden="true" />Edit</a
+  >
+  } @if (canRotate) {
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    [attr.aria-disabled]="lock() || null"
+    [hlmTooltip]="lock() || 'Rotate key now'"
+    (click)="requestRotation(item)"
+  >
+    <ng-icon name="lucideRefreshCw" aria-hidden="true" />Rotate
+  </button>
+  } @if (canExport()) {
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    [attr.aria-disabled]="exporting() || null"
+    [attr.aria-busy]="exporting() || null"
+    hlmTooltip="Download the configuration file; a key held in the database includes its private key"
+    (click)="exportKey()"
+  >
+    @if (exporting()) { <hlm-spinner class="size-4" aria-hidden="true" />Downloading… } @else {
+    <ng-icon name="lucideDownload" aria-hidden="true" />Download configuration }
+  </button>
+  }
+  <button
+    hlmBtn
+    variant="outline"
+    size="icon"
+    type="button"
+    aria-label="View as JSON"
+    hlmTooltip="View as JSON"
+    (click)="showJson.set(true)"
+  >
+    <ng-icon name="lucideBraces" />
+  </button>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    class="hover:text-destructive"
+    [attr.aria-disabled]="lock() || null"
+    [hlmTooltip]="lock() || 'Delete key chain'"
+    (click)="requestDelete(item)"
+  >
+    <ng-icon name="lucideTrash2" aria-hidden="true" />Delete
+  </button>
+</app-page-header>
+
+<hlm-dialog
+  [state]="showJson() ? 'open' : 'closed'"
+  (stateChanged)="$event === 'closed' && showJson.set(false)"
+>
+  <hlm-dialog-content *hlmDialogPortal="let ctx" class="sm:max-w-2xl">
+    <hlm-dialog-header>
+      <h2 hlmDialogTitle>Key chain as JSON</h2>
+      <p hlmDialogDescription>As the API returns it, without private key material.</p>
+    </hlm-dialog-header>
+    <pre
+      class="bg-muted/50 max-h-[60vh] overflow-auto rounded-xl p-4 font-mono text-xs leading-relaxed"
+      tabindex="0"
+      aria-label="Key chain as JSON"
+    >
+{{ item | json }}</pre>
+    <hlm-dialog-footer>
+      <button hlmBtn variant="outline" type="button" (click)="copyJson(item)">
+        <ng-icon name="lucideClipboard" aria-hidden="true" />Copy
+      </button>
+      <button hlmBtn type="button" (click)="showJson.set(false)">Close</button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>
+
+@if (lock()) {
+<div
+  class="mb-5 flex gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 text-sm"
+  role="note"
+>
+  <ng-icon name="lucideLock" class="mt-0.5 shrink-0" aria-hidden="true" />
+  <span>{{ lock() }}</span>
+</div>
+}
+
+<div class="grid gap-5">
+  <section class="bg-card rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <div class="flex flex-wrap items-center gap-2">
+          <h2 class="text-lg font-semibold">
+            {{ item.type === 'internalChain' ? 'Internal chain' : 'Standalone key' }}
+          </h2>
+          <span class="bg-muted rounded-full px-2.5 py-1 text-xs font-medium"
+            >{{ usageLabel(item.usageType) }}</span
+          >
+          @if (item.rotationPolicy.enabled) {
+          <span class="bg-primary/10 text-primary rounded-full px-2.5 py-1 text-xs font-medium"
+            >Rotating</span
+          >
+          } @if (item.usageType === 'access' && defaultChip(defaults.data(), item.id); as mark) {
+          <span
+            class="bg-primary/10 text-primary rounded-full px-2.5 py-1 text-xs font-medium"
+            [hlmTooltip]="mark.description"
+            >{{ mark.label }}</span
+          >
+          }
+        </div>
+        <p class="text-muted-foreground mt-2 max-w-prose text-sm">{{ typeDescription(item) }}</p>
+      </div>
+      @if (item.usageType === 'access' && defaults.isSuccess()) {
+      <button
+        hlmBtn
+        variant="outline"
+        type="button"
+        [attr.aria-label]="defaultToggleLabel(defaults.data(), item.id, keyName(item))"
+        [attr.aria-disabled]="saving() || defaultsLock() || null"
+        [hlmTooltip]="defaultsLock() || defaultToggleTooltip(defaults.data(), item.id)"
+        (click)="toggleDefault()"
+      >
+        <ng-icon
+          [name]="isDefault(defaults.data(), item.id) ? 'lucideStar' : 'lucideStarOff'"
+          aria-hidden="true"
+        />
+        {{ isDefault(defaults.data(), item.id) ? 'Remove default' : 'Set as default' }}
+      </button>
+      }
+    </div>
+    @if (item.usageType === 'access' && defaults.isError()) {
+    <p class="mt-3 flex flex-wrap items-center gap-2 text-sm" role="status">
+      <ng-icon name="lucideCircleAlert" class="text-muted-foreground" aria-hidden="true" />
+      <span class="text-muted-foreground"
+        >Default access key-chain status could not be loaded; default actions are unavailable.</span
+      >
+      <button hlmBtn variant="link" size="sm" type="button" (click)="defaults.refetch()">
+        Retry
+      </button>
+    </p>
+    }
+    <dl class="mt-5 grid gap-4 border-t pt-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <div>
+        <dt class="text-muted-foreground">ID</dt>
+        <dd class="mt-1 break-all font-mono">{{ item.id }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground">KMS provider</dt>
+        <dd class="mt-1">{{ item.kmsProvider }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground">Signing algorithm</dt>
+        <dd class="mt-1">
+          {{ item.alg ? item.alg + (item.activePublicKey.crv ? ' (ECDSA ' + item.activePublicKey.crv
+          + ')' : '') : 'Not specified' }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground">Created</dt>
+        <dd class="mt-1">{{ dateTime(item.createdAt) }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section class="bg-card rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8">
+    <h2 class="flex items-center gap-2 font-semibold">
+      <ng-icon name="lucideRefreshCw" aria-hidden="true" />Rotation policy
+    </h2>
+    <dl class="mt-4 grid gap-4 text-sm sm:grid-cols-3">
+      <div>
+        <dt class="text-muted-foreground">Status</dt>
+        <dd class="mt-1">{{ item.rotationPolicy.enabled ? 'Enabled' : 'Disabled' }}</dd>
+      </div>
+      @if (item.rotationPolicy.enabled) {
+      <div>
+        <dt class="text-muted-foreground">Interval</dt>
+        <dd class="mt-1">{{ item.rotationPolicy.intervalDays }} days</dd>
+      </div>
+      @if (item.rotationPolicy.nextRotationAt) {
+      <div>
+        <dt class="text-muted-foreground">Next rotation</dt>
+        <dd class="mt-1">{{ dateTime(item.rotationPolicy.nextRotationAt) }}</dd>
+      </div>
+      } } @if (item.rotationPolicy.certValidityDays) {
+      <div>
+        <dt class="text-muted-foreground">Certificate validity</dt>
+        <dd class="mt-1">{{ item.rotationPolicy.certValidityDays }} days</dd>
+      </div>
+      }
+    </dl>
+  </section>
+
+  @if (item.rootCertificate; as root) {
+  <section class="bg-card rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8">
+    <h2 class="flex items-center gap-2 font-semibold">
+      <ng-icon name="lucideShieldCheck" aria-hidden="true" />Root CA certificate
+    </h2>
+    <dl class="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+      <div>
+        <dt class="text-muted-foreground">Subject</dt>
+        <dd class="mt-1 break-words">{{ root.subject || 'Not available' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground">Valid until</dt>
+        <dd class="mt-1">
+          {{ root.notAfter ? dateTime(root.notAfter) : 'Not available' }} @if (certExpired(root)) {
+          <span class="text-destructive font-medium">Expired</span> }
+        </dd>
+      </div>
+    </dl>
+    <button hlmBtn variant="outline" type="button" class="mt-4" (click)="copyCertificate(root)">
+      <ng-icon name="lucideClipboard" aria-hidden="true" />Copy PEM
+    </button>
+  </section>
+  } @if (publishesJwk) {
+  <section class="bg-card rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8">
+    <h2 class="font-semibold">Public key</h2>
+    <p class="text-muted-foreground mt-1 text-sm">
+      Published as a JWK for {{ item.usageType === 'federation' ? 'the OpenID Federation entity
+      configuration' : 'authorization server access-token JWKS' }}. Its certificate is not used for
+      signing.
+    </p>
+    <p class="mt-4 text-sm">
+      <span class="text-muted-foreground">Key ID (kid): </span
+      ><code>{{ item.activePublicKey.kid || 'Not available' }}</code>
+    </p>
+    <pre class="bg-muted/50 mt-3 overflow-x-auto rounded-xl p-4 text-xs">
+{{ item.activePublicKey | json }}</pre>
+    <button
+      hlmBtn
+      variant="outline"
+      type="button"
+      class="mt-3"
+      (click)="copyPublicKey(item.activePublicKey)"
+    >
+      <ng-icon name="lucideClipboard" aria-hidden="true" />Copy public key (JWK)
+    </button>
+  </section>
+  } @else if (item.activeCertificate; as active) {
+  <section class="bg-card rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8">
+    <h2 class="flex items-center gap-2 font-semibold">
+      <ng-icon name="lucideShieldCheck" aria-hidden="true" />Active certificate
+    </h2>
+    <dl class="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+      <div>
+        <dt class="text-muted-foreground">Subject</dt>
+        <dd class="mt-1 break-words">{{ active.subject || 'Not available' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground">Issuer</dt>
+        <dd class="mt-1 break-words">{{ active.issuer || 'Not available' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground">Valid from</dt>
+        <dd class="mt-1">{{ active.notBefore ? dateTime(active.notBefore) : 'Not available' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground">Valid until</dt>
+        <dd class="mt-1">
+          {{ active.notAfter ? dateTime(active.notAfter) : 'Not available' }} @if
+          (certExpired(active)) { <span class="text-destructive font-medium">Expired</span> }
+        </dd>
+      </div>
+    </dl>
+    <div class="mt-4 flex flex-wrap gap-2">
+      <button hlmBtn variant="outline" type="button" (click)="copyCertificate(active)">
+        <ng-icon name="lucideClipboard" aria-hidden="true" />Copy PEM
+      </button>
+      <button hlmBtn variant="outline" type="button" (click)="copyPublicKey(item.activePublicKey)">
+        <ng-icon name="lucideClipboard" aria-hidden="true" />Copy public key (JWK)
+      </button>
+      @if (canEnrollWithRegistrar) {
+      <button
+        hlmBtn
+        variant="outline"
+        type="button"
+        [attr.aria-disabled]="isEnrolling || lock() || null"
+        [hlmTooltip]="lock() || (isEnrolling ? 'Enrolling with the registrar…' : 'Request a certificate from the registrar')"
+        (click)="enrollWithRegistrar()"
+      >
+        @if (isEnrolling) { <hlm-spinner class="size-4" aria-hidden="true" />Enrolling… } @else {
+        <ng-icon name="lucideRefreshCw" aria-hidden="true" />Enroll with registrar }
+      </button>
+      } @else if (registrarMissing) {
+      <a hlmBtn variant="outline" routerLink="/registrar"
+        >Configure the registrar to enroll this key</a
+      >
+      }
+    </div>
+    @if (registrarContactMissing) {
+    <p class="text-muted-foreground mt-3 text-sm">
+      No relying party contact is set; the first registrar enrollment needs one. Add a contact in
+      registrar settings.
+    </p>
+    }
+  </section>
+  } @if (showCertificateRequest) {
+  <app-key-certificate-request
+    [key]="item"
+    [locked]="lock()"
+    [startExpanded]="startCertificateRequest"
+    (certificateSaved)="certificateSaved()"
+  />
+  } @if (!publishesJwk && item.previousCertificate; as previous) {
+  <section class="bg-card rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8">
+    <h2 class="font-semibold">Previous certificate (grace period)</h2>
+    @if (item.previousKeyExpiry) {
+    <p class="text-muted-foreground mt-1 text-sm">Expires {{ dateTime(item.previousKeyExpiry) }}</p>
+    }
+    <dl class="mt-4 grid gap-4 text-sm sm:grid-cols-2">
+      <div>
+        <dt class="text-muted-foreground">Subject</dt>
+        <dd class="mt-1 break-words">{{ previous.subject || 'Not available' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground">Valid until</dt>
+        <dd class="mt-1">
+          {{ previous.notAfter ? dateTime(previous.notAfter) : 'Not available' }}
+        </dd>
+      </div>
+    </dl>
+    <div class="mt-4 flex flex-wrap gap-2">
+      <button hlmBtn variant="outline" type="button" (click)="copyCertificate(previous)">
+        <ng-icon name="lucideClipboard" aria-hidden="true" />Copy PEM
+      </button>
+      @if (item.previousPublicKey) {
+      <button
+        hlmBtn
+        variant="outline"
+        type="button"
+        (click)="copyPublicKey(item.previousPublicKey)"
+      >
+        <ng-icon name="lucideClipboard" aria-hidden="true" />Copy public key (JWK)
+      </button>
+      }
+    </div>
+  </section>
+  }
+</div>
+}
+
+<hlm-alert-dialog
+  [state]="pendingAction() ? 'open' : 'closed'"
+  (stateChanged)="!$event.includes('open') && closeActionDialog()"
+>
+  <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+    <hlm-alert-dialog-header>
+      <h2 hlmAlertDialogTitle>
+        @if (pendingAction()?.kind === 'delete') { Delete this key chain? } @else { Rotate this key
+        chain now? }
+      </h2>
+      <p hlmAlertDialogDescription>{{ actionDescription(pendingAction()) }}</p>
+    </hlm-alert-dialog-header>
+    <hlm-alert-dialog-footer>
+      <button hlmAlertDialogCancel type="button" [disabled]="saving()" (click)="ctx.close()">
+        Cancel
+      </button>
+      <button
+        hlmAlertDialogAction
+        variant="destructive"
+        type="button"
+        [disabled]="saving()"
+        (click)="confirmAction()"
+      >
+        @if (saving()) { Working… } @else if (pendingAction()?.kind === 'delete') { Delete key chain
+        } @else { Rotate key chain }
+      </button>
+    </hlm-alert-dialog-footer>
+  </hlm-alert-dialog-content>
+</hlm-alert-dialog>

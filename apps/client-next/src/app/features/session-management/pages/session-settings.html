@@ -1,0 +1,202 @@
+<app-page-header
+  heading="Session settings"
+  description="Set how long your tenant keeps sessions and what happens when they expire."
+>
+  <a hlmBtn variant="outline" routerLink="/session-management">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    Sessions
+  </a>
+</app-page-header>
+
+<app-ownership-notice kind="Tenant" [resource]="owner()" />
+
+@if (settings.isPending()) {
+<section class="space-y-4 rounded-xl border p-6" aria-label="Loading session settings">
+  <hlm-skeleton class="h-6 w-56" />
+  <hlm-skeleton class="h-4 w-full max-w-2xl" />
+  <hlm-skeleton class="h-12 w-full max-w-md" />
+</section>
+} @else if (settings.isError()) {
+<section class="rounded-xl border border-destructive/40 p-6" role="alert">
+  <h2 class="font-semibold">Could not load session settings</h2>
+  <p class="text-muted-foreground mt-1">{{ errorMessage(settings.error()) }}</p>
+  <button hlmBtn variant="outline" class="mt-4" type="button" (click)="retry()">Retry</button>
+</section>
+} @else {
+<form #formElement [formGroup]="form" (ngSubmit)="save()" class="space-y-6" novalidate>
+  <section class="rounded-xl border p-5 sm:p-6">
+    <div class="flex items-start gap-3">
+      <ng-icon name="lucideTimer" class="text-primary mt-1 size-5 shrink-0" aria-hidden="true" />
+      <div class="min-w-0 flex-1 space-y-4">
+        <div>
+          <h2 class="text-lg font-semibold">Session time-to-live (TTL)</h2>
+          <p class="text-muted-foreground mt-1 text-sm leading-relaxed">
+            Sessions older than this are processed by the cleanup job. Leave this empty to use the
+            instance default set by <code>SESSION_TTL</code>.
+          </p>
+        </div>
+        <div class="max-w-md space-y-2">
+          <label for="session-ttl" class="text-sm font-medium">TTL in seconds</label>
+          <input
+            id="session-ttl"
+            hlmInput
+            type="number"
+            min="60"
+            step="1"
+            formControlName="ttlSeconds"
+            placeholder="Use instance default"
+            [attr.aria-invalid]="form.controls.ttlSeconds.invalid && form.controls.ttlSeconds.touched"
+          />
+          @if (form.controls.ttlSeconds.touched && form.controls.ttlSeconds.hasError('min')) {
+          <p class="text-destructive text-sm">TTL must be at least 60 seconds.</p>
+          } @else if ( form.controls.ttlSeconds.touched &&
+          form.controls.ttlSeconds.hasError('integer') ) {
+          <p class="text-destructive text-sm">Enter a whole number of seconds.</p>
+          }
+          <p class="text-muted-foreground text-sm">
+            Current value: {{ formatTtl(form.controls.ttlSeconds.value) }}
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2" aria-label="TTL presets">
+          @for (preset of ttlPresets; track preset.value) {
+          <button
+            hlmBtn
+            variant="outline"
+            type="button"
+            [attr.aria-pressed]="form.controls.ttlSeconds.value === preset.value"
+            (click)="form.controls.ttlSeconds.setValue(preset.value)"
+          >
+            {{ preset.label }}
+          </button>
+          }
+          <button
+            hlmBtn
+            variant="ghost"
+            type="button"
+            [attr.aria-pressed]="form.controls.ttlSeconds.value === null"
+            (click)="form.controls.ttlSeconds.setValue(null)"
+          >
+            Use default
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="rounded-xl border p-5 sm:p-6">
+    <div class="flex items-start gap-3">
+      <ng-icon name="lucideInfo" class="text-primary mt-1 size-5 shrink-0" aria-hidden="true" />
+      <div class="min-w-0 flex-1 space-y-4">
+        <div>
+          <h2 class="text-lg font-semibold">Cleanup mode</h2>
+          <p class="text-muted-foreground mt-1 text-sm leading-relaxed">
+            Choose how the cleanup job handles expired sessions. Without an override, the instance
+            setting <code>SESSION_CLEANUP_MODE</code> applies.
+          </p>
+        </div>
+        <div class="max-w-xl space-y-2">
+          <label for="cleanup-mode" class="text-sm font-medium">Cleanup mode</label>
+          <select
+            id="cleanup-mode"
+            formControlName="cleanupMode"
+            class="border-input bg-background ring-offset-background focus-visible:ring-ring h-10 w-full rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
+          >
+            <option value="" [disabled]="hasStoredCleanupMode()">
+              Use instance default @if (hasStoredCleanupMode()) { (reset settings to clear the
+              stored mode) }
+            </option>
+            @for (mode of cleanupModes; track mode.value) {
+            <option [value]="mode.value">{{ mode.label }} — {{ mode.description }}</option>
+            }
+          </select>
+          @if (form.controls.cleanupMode.value === 'anonymize') {
+          <p class="bg-primary/5 text-muted-foreground rounded-lg p-3 text-sm">
+            Anonymize mode keeps session metadata (ID, status and timestamps) and removes
+            credentials, credential payloads, offers and request objects.
+          </p>
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <button
+      hlmBtn
+      variant="outline"
+      type="button"
+      [disabled]="!canReset() || busy()"
+      [attr.aria-describedby]="!canReset() ? 'reset-settings-hint' : null"
+      (click)="canReset() && !busy() && confirmingReset.set(true)"
+    >
+      <ng-icon name="lucideRotateCcw" aria-hidden="true" />
+      Reset to defaults
+    </button>
+    <p id="reset-settings-hint" class="text-muted-foreground text-sm">
+      @if (locked()) { {{ locked() }} } @else if (!storedOverride()) { This tenant already follows
+      the instance defaults. }
+    </p>
+    <div class="ml-auto flex items-center gap-2">
+      @if (form.dirty) {
+      <button hlmBtn variant="ghost" type="button" [disabled]="busy()" (click)="discard()">
+        Discard changes
+      </button>
+      }
+      <button
+        hlmBtn
+        type="submit"
+        [disabled]="busy() || !!locked()"
+        [attr.aria-describedby]="locked() ? 'reset-settings-hint' : null"
+      >
+        @if (busy()) {
+        <hlm-spinner class="size-4" aria-hidden="true" />
+        Saving… } @else {
+        <ng-icon name="lucideSave" aria-hidden="true" />
+        Save settings }
+      </button>
+    </div>
+  </div>
+
+  <section class="text-muted-foreground rounded-xl border p-4 text-sm">
+    <h2 class="text-foreground font-medium">Current stored settings</h2>
+    <dl class="mt-3 grid gap-3 sm:grid-cols-2">
+      <div>
+        <dt class="font-medium">Session TTL</dt>
+        <dd>{{ formatTtl(settings.data()?.ttlSeconds) }}</dd>
+      </div>
+      <div>
+        <dt class="font-medium">Cleanup mode</dt>
+        <dd>{{ cleanupModeLabel(settings.data()?.cleanupMode) }}</dd>
+      </div>
+    </dl>
+  </section>
+</form>
+}
+
+<hlm-alert-dialog
+  [state]="confirmingReset() ? 'open' : 'closed'"
+  (stateChanged)="onResetDialog($event)"
+>
+  <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+    <hlm-alert-dialog-header>
+      <h2 hlmAlertDialogTitle>Reset to the instance defaults?</h2>
+      <p hlmAlertDialogDescription>{{ resetDescription() }}</p>
+    </hlm-alert-dialog-header>
+    <hlm-alert-dialog-footer>
+      <button hlmAlertDialogCancel type="button" [disabled]="busy()" (click)="ctx.close()">
+        Keep settings
+      </button>
+      <button
+        hlmAlertDialogAction
+        variant="destructive"
+        type="button"
+        [disabled]="busy() || !!locked()"
+        (click)="reset()"
+      >
+        @if (busy()) {
+        <hlm-spinner class="size-4" aria-hidden="true" />
+        } Reset settings
+      </button>
+    </hlm-alert-dialog-footer>
+  </hlm-alert-dialog-content>
+</hlm-alert-dialog>

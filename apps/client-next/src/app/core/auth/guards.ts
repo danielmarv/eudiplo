@@ -34,6 +34,8 @@ export const authGuard: CanActivateFn = async (_route, state) => {
 export function requireRole(...roles: Role[]): CanActivateFn {
   return async (_route, state) => {
     const callers = inject(CallerService);
+    const router = inject(Router);
+    const notify = inject(NotifyService);
     await callers.loadCaller({ url: state.url });
     if (!callers.getCaller()) {
       return false;
@@ -41,7 +43,7 @@ export function requireRole(...roles: Role[]): CanActivateFn {
     if (callers.hasRole(roles)) {
       return true;
     }
-    inject(NotifyService).error('Your roles do not include this page.');
-    return inject(Router).createUrlTree(['/']);
+    notify.error('Your roles do not include this page.');
+    return router.createUrlTree(['/']);
   };
 }

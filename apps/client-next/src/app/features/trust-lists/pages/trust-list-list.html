@@ -1,0 +1,180 @@
+<app-page-header
+  heading="Trust lists"
+  description="Publish trusted issuers and manage which certificates wallets and verifiers accept."
+>
+  <a hlmBtn routerLink="create">
+    <ng-icon name="lucidePlus" aria-hidden="true" />
+    Create trust list
+  </a>
+</app-page-header>
+
+<section
+  class="bg-card overflow-hidden rounded-2xl shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+  aria-label="Trust lists"
+>
+  @if (lists.isSuccess() && lists.data().length) {
+  <div class="border-b p-4 sm:px-5">
+    <hlm-input-group class="h-9 w-full rounded-lg sm:max-w-80">
+      <hlm-input-group-addon>
+        <ng-icon name="lucideSearch" aria-hidden="true" />
+      </hlm-input-group-addon>
+      <input
+        hlmInputGroupInput
+        type="search"
+        aria-label="Search trust lists"
+        placeholder="Search by ID or description"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
+      />
+      @if (search()) {
+      <button
+        type="button"
+        class="text-muted-foreground hover:text-foreground grid size-8 place-items-center"
+        aria-label="Clear search"
+        (click)="search.set('')"
+      >
+        <ng-icon name="lucideX" aria-hidden="true" />
+      </button>
+      }
+    </hlm-input-group>
+  </div>
+  } @if (lists.isPending()) {
+  <div class="grid gap-3 p-5" aria-label="Loading trust lists" role="status">
+    @for (row of [1, 2, 3]; track row) {
+    <hlm-skeleton class="h-16 w-full rounded-xl" />
+    }
+  </div>
+  } @else if (lists.isError()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center" role="alert">
+    <span class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl">
+      <ng-icon name="lucideTriangleAlert" class="text-xl" aria-hidden="true" />
+    </span>
+    <p class="font-semibold">The trust lists could not be loaded</p>
+    <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(lists.error()) }}</p>
+    <button hlmBtn variant="outline" type="button" (click)="lists.refetch()">Retry</button>
+  </div>
+  } @else if (!lists.data()?.length) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <span class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl">
+      <ng-icon name="lucideShieldCheck" class="text-xl" aria-hidden="true" />
+    </span>
+    <p class="font-semibold">No trust lists yet</p>
+    <p class="text-muted-foreground max-w-sm text-sm">
+      Create a list to publish the issuers and certificates that wallets and verifiers can trust.
+    </p>
+    <a hlmBtn routerLink="create">
+      <ng-icon name="lucidePlus" aria-hidden="true" />
+      Create trust list
+    </a>
+  </div>
+  } @else if (!filteredLists().length) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <p class="font-semibold">No trust list matches “{{ search() }}”</p>
+    <button hlmBtn variant="outline" type="button" (click)="search.set('')">
+      <ng-icon name="lucideX" aria-hidden="true" />
+      Clear search
+    </button>
+  </div>
+  } @else {
+  <div class="overflow-x-auto">
+    <table hlmTable class="w-full table-fixed">
+      <thead hlmTHead class="bg-muted/40">
+        <tr hlmTr class="hover:bg-transparent">
+          <th hlmTh scope="col" class="ps-4 pe-2 sm:ps-5">Trust list</th>
+          <th hlmTh scope="col" class="hidden px-3 sm:table-cell">Description</th>
+          <th hlmTh scope="col" class="w-32 pe-3 text-end sm:pe-5">
+            <span class="sr-only">Actions</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody hlmTBody>
+        @for (list of filteredLists(); track list.id) {
+        <tr hlmTr class="hover:bg-muted/40">
+          <td hlmTd class="py-3 ps-4 pe-2 sm:ps-5">
+            <div class="flex min-w-0 items-center gap-3">
+              <span
+                class="bg-accent text-accent-foreground grid size-9 shrink-0 place-items-center rounded-xl"
+              >
+                <ng-icon name="lucideShieldCheck" aria-hidden="true" />
+              </span>
+              <span class="min-w-0">
+                <a
+                  [routerLink]="list.id"
+                  class="block truncate font-mono text-sm font-semibold hover:underline"
+                  [title]="list.id"
+                  >{{ list.id }}</a
+                >
+                <span class="text-muted-foreground block truncate text-xs sm:hidden">
+                  {{ list.description || 'No description' }}
+                </span>
+                @if (lockReason(list); as locked) {
+                <span class="text-muted-foreground inline-flex items-center gap-1 text-xs">
+                  <ng-icon name="lucideLock" aria-hidden="true" />
+                  Managed by a file
+                  <span class="sr-only">: {{ locked }}</span>
+                </span>
+                }
+              </span>
+            </div>
+          </td>
+          <td hlmTd class="hidden px-3 py-3 sm:table-cell">{{ list.description || '—' }}</td>
+          <td hlmTd class="py-3 pe-3 sm:pe-5">
+            <div class="flex justify-end gap-1">
+              @if (canDownload()) {
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                [attr.aria-label]="'Download the configuration of trust list ' + list.id"
+                hlmTooltip="Download configuration"
+                [attr.aria-disabled]="downloading(list) || null"
+                [attr.aria-busy]="downloading(list) || null"
+                (click)="download(list)"
+              >
+                <ng-icon name="lucideDownload" />
+              </button>
+              } @if (lockReason(list); as locked) {
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                class="cursor-not-allowed opacity-50"
+                aria-disabled="true"
+                [attr.aria-label]="'Edit trust list ' + list.id"
+                [hlmTooltip]="locked"
+              >
+                <ng-icon name="lucideLock" />
+              </button>
+              } @else {
+              <a
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                [routerLink]="[list.id, 'edit']"
+                [attr.aria-label]="'Edit trust list ' + list.id"
+                hlmTooltip="Edit"
+              >
+                <ng-icon name="lucidePencil" />
+              </a>
+              }
+              <a
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                [routerLink]="list.id"
+                [attr.aria-label]="'View trust list ' + list.id"
+                hlmTooltip="View details"
+              >
+                <ng-icon name="lucideShieldCheck" />
+              </a>
+            </div>
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</section>

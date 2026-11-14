@@ -1,0 +1,231 @@
+<app-page-header
+  heading="Schemas"
+  description="The schemas of your credential types in the registrar's catalog, which wallets and relying parties look up."
+>
+  @if (canPublish()) {
+  <a hlmBtn routerLink="create">
+    <ng-icon name="lucidePlus" aria-hidden="true" />
+    Publish schema
+  </a>
+  } @else {
+  <span id="publish-blocked" class="sr-only"
+    >Publishing a schema needs the issuance:manage role.</span
+  >
+  <button
+    hlmBtn
+    type="button"
+    class="cursor-not-allowed opacity-50"
+    aria-disabled="true"
+    aria-describedby="publish-blocked"
+    hlmTooltip="Publishing a schema needs the issuance:manage role."
+  >
+    <ng-icon name="lucidePlus" aria-hidden="true" />
+    Publish schema
+  </button>
+  }
+</app-page-header>
+
+<section
+  class="bg-card overflow-hidden rounded-2xl shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+  aria-label="Schemas"
+>
+  <div class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3.5 sm:px-5">
+    <hlm-input-group class="h-9 w-full rounded-lg sm:max-w-80">
+      <hlm-input-group-addon>
+        <ng-icon name="lucideSearch" aria-hidden="true" />
+      </hlm-input-group-addon>
+      <input
+        hlmInputGroupInput
+        type="search"
+        aria-label="Search schemas"
+        placeholder="Search by name, ID or issuer"
+        [value]="search()"
+        (input)="onSearch($event)"
+      />
+    </hlm-input-group>
+    @if (schemas.isSuccess() && groups().length) {
+    <p class="text-muted-foreground text-sm">
+      <span class="text-foreground font-medium tabular-nums">{{ groups().length }}</span>
+      {{ groups().length === 1 ? 'schema' : 'schemas' }},
+      <span class="tabular-nums">{{ versionCount() }}</span>
+      {{ versionCount() === 1 ? 'version' : 'versions' }}
+    </p>
+    }
+  </div>
+
+  @if (schemas.isPending()) {
+  <div class="grid gap-3 p-5" aria-label="Loading schemas" role="status">
+    @for (row of [1, 2, 3]; track row) {
+    <hlm-skeleton class="h-14 w-full rounded-xl" />
+    }
+  </div>
+  } @else if (schemas.isError()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center" role="alert">
+    <span
+      class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideTriangleAlert" class="text-xl" />
+    </span>
+    <p class="font-semibold">The schemas could not be loaded</p>
+    <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(schemas.error()) }}</p>
+    <p class="text-muted-foreground max-w-md text-sm">
+      The schemas come from the registrar; check its configuration if this keeps failing.
+    </p>
+    <div class="flex flex-wrap justify-center gap-2">
+      <button hlmBtn variant="outline" type="button" (click)="schemas.refetch()">Retry</button>
+      <a hlmBtn variant="ghost" routerLink="/registrar">Registrar configuration</a>
+    </div>
+  </div>
+  } @else if (!groups().length) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <span
+      class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideBraces" class="text-xl" />
+    </span>
+    <p class="font-semibold">No schemas published yet</p>
+    <p class="text-muted-foreground max-w-sm text-sm">
+      Publish the schema of a credential type so wallets and relying parties can find it in the
+      registrar's catalog.
+    </p>
+    @if (canPublish()) {
+    <a hlmBtn routerLink="create">
+      <ng-icon name="lucidePlus" aria-hidden="true" />
+      Publish schema
+    </a>
+    } @else {
+    <p class="text-muted-foreground text-sm">Publishing a schema needs the issuance:manage role.</p>
+    }
+  </div>
+  } @else if (!matching()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <p class="font-semibold">No schema matches “{{ search() }}”</p>
+    <button hlmBtn variant="outline" type="button" (click)="clearSearch()">
+      <ng-icon name="lucideX" aria-hidden="true" />
+      Clear search
+    </button>
+  </div>
+  } @else {
+  <div hlmTableContainer>
+    <table hlmTable class="table-fixed">
+      <thead hlmTHead class="bg-muted/40">
+        <tr hlmTr class="hover:bg-transparent">
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground ps-4 pe-2 sm:ps-5 lg:w-[34%]"
+            [attr.aria-sort]="ariaSort(column('name'))"
+          >
+            <app-sort-toggle [column]="column('name')">Schema</app-sort-toggle>
+          </th>
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground hidden px-3 md:table-cell"
+            [attr.aria-sort]="ariaSort(column('versions'))"
+          >
+            <app-sort-toggle [column]="column('versions')">Versions</app-sort-toggle>
+          </th>
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground hidden w-48 px-3 lg:table-cell"
+            [attr.aria-sort]="ariaSort(column('issuer'))"
+          >
+            <app-sort-toggle [column]="column('issuer')">Issuer</app-sort-toggle>
+          </th>
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground hidden w-44 px-3 sm:table-cell"
+            [attr.aria-sort]="ariaSort(column('updated'))"
+          >
+            <app-sort-toggle [column]="column('updated')">Updated</app-sort-toggle>
+          </th>
+          <th hlmTh scope="col" class="w-16 pe-3 sm:pe-5"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody hlmTBody>
+        @for (row of table.getRowModel().rows; track row.id) { @let group = row.original;
+        <tr hlmTr class="hover:bg-muted/40">
+          <td hlmTd class="py-3 ps-4 pe-2 sm:ps-5">
+            <div class="flex min-w-0 items-center gap-3">
+              <span
+                class="bg-accent text-accent-foreground grid size-9 shrink-0 place-items-center rounded-xl"
+                aria-hidden="true"
+              >
+                <ng-icon name="lucideBraces" />
+              </span>
+              <span class="min-w-0">
+                <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <a
+                    [routerLink]="group.id"
+                    class="max-w-full truncate font-semibold hover:underline"
+                    >{{ group.name }}</a
+                  >
+                  @if (group.deprecated) {
+                  <span
+                    class="bg-warning/12 text-warning shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+                    >Deprecated</span
+                  >
+                  }
+                </span>
+                <span class="text-muted-foreground block truncate font-mono text-xs"
+                  >{{ group.id }}</span
+                >
+              </span>
+            </div>
+          </td>
+          <td hlmTd class="hidden px-3 py-3 whitespace-normal md:table-cell">
+            <ul
+              class="flex flex-wrap gap-1.5 text-xs"
+              [attr.aria-label]="'Versions of ' + group.name"
+            >
+              @for (version of group.versions.slice(0, 4); track version; let first = $first) {
+              <li>
+                <a
+                  class="inline-block rounded-md px-1.5 py-0.5 font-mono hover:underline"
+                  [class]="first ? 'bg-primary/8 text-primary dark:bg-primary/15' : 'bg-muted'"
+                  [routerLink]="group.id"
+                  [queryParams]="{ version }"
+                  >{{ version }}</a
+                >
+              </li>
+              } @if (group.versions.length > 4) {
+              <li class="text-muted-foreground px-1 py-0.5">
+                and {{ group.versions.length - 4 }} more
+              </li>
+              }
+            </ul>
+          </td>
+          <td hlmTd class="hidden px-3 py-3 lg:table-cell">
+            <span class="block truncate" [title]="group.issuer">{{ group.issuer }}</span>
+          </td>
+          <td hlmTd class="text-muted-foreground hidden px-3 py-3 sm:table-cell">
+            <span [title]="dateTime(group.updatedAt)">{{ relativeTime(group.updatedAt) }}</span>
+          </td>
+          <td hlmTd class="py-3 pe-3 sm:pe-5">
+            <div class="flex justify-end">
+              <a
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                class="text-muted-foreground"
+                [routerLink]="group.id"
+                [attr.aria-label]="'Open ' + group.name"
+                hlmTooltip="Open"
+              >
+                <ng-icon name="lucideChevronRight" />
+              </a>
+            </div>
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <app-table-pagination [table]="table" singular="schema" plural="schemas" />
+  }
+</section>

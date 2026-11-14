@@ -37,9 +37,11 @@ apps/client-next/
         ├── shared/          # reusable app components and helpers
         │   ├── api-key-endpoint/ # form of endpoints called with an API key (attribute providers, webhooks)
         │   ├── brand/       # Diplo, the guilloche, monograms
+        │   ├── certificates/ # check an X.509 certificate in PEM or base64 DER
         │   ├── clipboard/   # copy with a notice
         │   ├── config-ownership/ # file-managed locks, ownership notice, configuration download
         │   ├── data-table/  # TanStack Table features, sort toggle, pagination bar
+        │   ├── dialogs/     # confirmation dialog (ConfirmService)
         │   ├── format/      # durations, dates, relative times, JWT parts
         │   ├── forms/       # field-to-fix, focus helpers, controls of default-able settings
         │   ├── pages/       # page header, placeholder page
@@ -66,7 +68,7 @@ To move a feature from `apps/client`, replace its `pending(...)` route in `app.r
 
 **Data.** Call the backend only through `@eudiplo/sdk-core`. Wrap each call in a `queryOptions` or mutation in the feature's `data/` folder, with a query key that starts with the resource and includes the instance URL, so a sign-in elsewhere never shows another instance's data. The SDK throws the backend's error body; show it with `getApiErrorMessage` from `core/errors` and `NotifyService.error`.
 
-**Lists.** A list is a [TanStack Table](https://tanstack.com/table/latest/docs/framework/angular/angular-table) built with `injectTable` and the shared `listFeatures` (`shared/data-table`): sorting, a search over several fields (`searchIn`), column filters and pagination, all in the browser, since the backend returns lists whole. Keep the columns in a constant outside the component, hold sorting and pagination in signals, and go back to the first page when the search, a filter or the order changes. The template writes the cells itself, so links and buttons stay ordinary Angular markup; headers use `<app-sort-toggle>` with `ariaSort`, and the foot `<app-table-pagination>`.
+**Lists.** A list is a [TanStack Table](https://tanstack.com/table/latest/docs/framework/angular/angular-table) built with `injectTable` and the shared `listFeatures` (`shared/data-table`). Lists returned whole by the backend can sort, search and paginate in the browser; server-paginated lists, such as sessions, pass filters, sorting and pagination to the API. Keep the columns in a constant outside the component, hold table state in signals, and go back to the first page when a filter or sort order changes. The template writes the cells itself, so links and buttons stay ordinary Angular markup; headers use `<app-sort-toggle>` with `ariaSort`, and the foot `<app-table-pagination>`.
 
 **Notices.** Use `NotifyService` (`success`, `info`, `warning`, `error`). An error stays long enough to read its message, and one with an action (Retry) can stay until it is closed.
 
@@ -85,5 +87,11 @@ To move a feature from `apps/client`, replace its `pending(...)` route in `app.r
 ## Carried over from `apps/client`
 
 The session and token handling, OIDC, the caller and its roles, the error messages and the form helpers came over with their specs, renamed where the old name did not say what the code does: `ApiService` is `SessionService`, `JwtService` is `CallerService`. The login page keeps the behaviour of the old one: kept and ended sessions, the instance check for SSO, and the confirmation before signing in at an instance a link chose.
+
+Presentation configurations are rebuilt at `/presentation-config`: the list and details, create/edit/copy/delete, configuration download, registration-certificate reissue, and request creation link. The editor supports guided and direct setup, visual and JSON DCQL, issuer and schema imports, templates, registration-certificate sources, status checks, origins, signing-key selection, webhooks, attachments and transaction data.
+
+Session management is rebuilt at `/session-management` and `/session-management/config`: the list supports server-side search, filters, sorting, URL-restored pagination, and role-aware bulk cancellation and deletion; the settings page manages tenant TTL and cleanup-mode overrides with reset and file-ownership handling.
+
+The integration pages are rebuilt: webhook endpoints at `/webhook-endpoints` (list, details with the configurations that use one, create, edit, delete, download), the registrar connection at `/registrar`, and schemas at `/schema` (the catalog list, a version's details with publishing a new version, deprecation, deletion and catalog metadata, and publishing a new schema from credential types and trust lists or root certificates).
 
 Not carried over yet: the reaction to refused requests and expiring tokens (`ApiRefusalService` is here, but not started), the version check, and the Playwright tests.

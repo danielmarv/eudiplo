@@ -1,0 +1,416 @@
+<app-page-header
+  heading="Publish schema"
+  description="Describe a credential type in the registrar's catalog. EUDIPLO builds the schema of each selected credential type, signs the metadata with your access certificate and submits it."
+/>
+
+<form #formElement class="grid max-w-4xl gap-6" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="schema-heading"
+  >
+    <h2 id="schema-heading" class="font-semibold">Schema</h2>
+    <p class="text-muted-foreground mt-1 text-sm">How the catalog names and classifies it.</p>
+
+    <div class="mt-5 grid gap-x-6 gap-y-5 md:grid-cols-2">
+      <hlm-field class="content-start gap-2">
+        <label hlmFieldLabel for="schema-name">Name</label>
+        <input
+          hlmInput
+          id="schema-name"
+          class="h-10"
+          formControlName="name"
+          placeholder="German PID"
+        />
+        <hlm-field-error validator="required">Enter the name.</hlm-field-error>
+      </hlm-field>
+
+      <hlm-field class="content-start gap-2">
+        <label hlmFieldLabel for="schema-version">Version</label>
+        <input
+          hlmInput
+          id="schema-version"
+          class="h-10 font-mono text-sm"
+          formControlName="version"
+          placeholder="1.0.0"
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <p hlmFieldDescription>A semantic version, such as 1.0.0 or 1.0.0-beta.1.</p>
+        <hlm-field-error validator="required">Enter the version.</hlm-field-error>
+        <hlm-field-error validator="pattern"
+          >Enter a semantic version, such as 1.0.0 or 1.0.0-beta.1.</hlm-field-error
+        >
+      </hlm-field>
+
+      <hlm-field class="content-start gap-2 md:col-span-2">
+        <label hlmFieldLabel for="schema-rulebook">Rulebook URI</label>
+        <input
+          hlmInput
+          id="schema-rulebook"
+          class="h-10 font-mono text-sm"
+          type="url"
+          formControlName="rulebookURI"
+          placeholder="https://example.com/rulebooks/pid/1.0.0.md"
+          spellcheck="false"
+        />
+        <p hlmFieldDescription>
+          The rules of the credential type. EUDIPLO downloads it and the registrar stores its
+          integrity hash.
+        </p>
+        <hlm-field-error validator="required">Enter the rulebook URI.</hlm-field-error>
+      </hlm-field>
+
+      <hlm-field class="content-start gap-2">
+        <label hlmFieldLabel for="schema-los">Level of security</label>
+        <hlm-native-select
+          class="w-full"
+          selectClass="h-10"
+          selectId="schema-los"
+          formControlName="attestationLoS"
+        >
+          <option value="" disabled [selected]="!form.controls.attestationLoS.value">
+            Choose a level…
+          </option>
+          @for (option of losOptions; track option.value) {
+          <option
+            [value]="option.value"
+            [selected]="form.controls.attestationLoS.value === option.value"
+          >
+            {{ option.label }} (ISO 18045)
+          </option>
+          }
+        </hlm-native-select>
+        <hlm-field-error validator="required">Choose the level of security.</hlm-field-error>
+      </hlm-field>
+
+      <hlm-field class="content-start gap-2">
+        <label hlmFieldLabel for="schema-binding">Binding</label>
+        <hlm-native-select
+          class="w-full"
+          selectClass="h-10"
+          selectId="schema-binding"
+          formControlName="bindingType"
+        >
+          <option value="" disabled [selected]="!form.controls.bindingType.value">
+            Choose a binding…
+          </option>
+          @for (option of bindingOptions; track option.value) {
+          <option
+            [value]="option.value"
+            [selected]="form.controls.bindingType.value === option.value"
+          >
+            {{ option.label }}
+          </option>
+          }
+        </hlm-native-select>
+        <p hlmFieldDescription>How a credential is bound to its holder.</p>
+        <hlm-field-error validator="required">Choose the binding.</hlm-field-error>
+      </hlm-field>
+
+      <hlm-field class="content-start gap-2">
+        <label hlmFieldLabel for="schema-category">Category</label>
+        <hlm-native-select
+          class="w-full"
+          selectClass="h-10"
+          selectId="schema-category"
+          formControlName="category"
+        >
+          <option value="" [selected]="!form.controls.category.value">None</option>
+          @for (option of categories(); track option.code) {
+          <option
+            [value]="option.code"
+            [disabled]="option.status === 'deprecated'"
+            [selected]="form.controls.category.value === option.code"
+          >
+            {{ vocabularyLabel(option) }}
+          </option>
+          }
+        </hlm-native-select>
+        @if (vocabularies.isPending()) {
+        <p hlmFieldDescription role="status">Loading the categories…</p>
+        } @else if (vocabularies.isError()) {
+        <p hlmFieldDescription>The categories could not be loaded from the registrar.</p>
+        } @else if (!categories().length) {
+        <p hlmFieldDescription>The registrar offers no categories.</p>
+        }
+      </hlm-field>
+    </div>
+
+    <fieldset class="mt-5 min-w-0">
+      <legend class="mb-2 text-sm font-medium">Tags</legend>
+      @if (vocabularies.isPending()) {
+      <hlm-skeleton class="h-16 w-full rounded-lg" />
+      } @else if (vocabularies.isError()) {
+      <p class="text-muted-foreground text-sm">
+        The tags could not be loaded from the registrar.
+        <button
+          hlmBtn
+          variant="link"
+          size="sm"
+          type="button"
+          class="h-auto p-0"
+          (click)="vocabularies.refetch()"
+        >
+          Retry
+        </button>
+      </p>
+      } @else if (!tags().length) {
+      <p class="text-muted-foreground text-sm">The registrar offers no tags.</p>
+      } @else {
+      <div class="grid gap-0.5 sm:grid-cols-2 lg:grid-cols-3">
+        @for (tag of tags(); track tag.code) { @let deprecated = tag.status === 'deprecated';
+        <label
+          class="has-[[data-state=checked]]:bg-primary/5 flex items-start gap-3 rounded-lg px-2.5 py-2"
+          [class.cursor-pointer]="!deprecated"
+          [class.hover:bg-muted/60]="!deprecated"
+          [for]="'tag-' + tag.code"
+        >
+          <hlm-checkbox
+            class="mt-0.5"
+            [inputId]="'tag-' + tag.code"
+            [checked]="selectedTags().includes(tag.code)"
+            [disabled]="deprecated && !selectedTags().includes(tag.code)"
+            (checkedChange)="toggle('tags', tag.code, $event === true)"
+          />
+          <span class="min-w-0 text-sm">{{ vocabularyLabel(tag) }}</span>
+        </label>
+        }
+      </div>
+      }
+    </fieldset>
+  </section>
+
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="configs-heading"
+  >
+    <fieldset class="min-w-0" aria-describedby="configs-hint">
+      <legend id="configs-heading" class="font-semibold">Credential types</legend>
+      <p id="configs-hint" class="text-muted-foreground mt-1 text-sm">
+        EUDIPLO builds and uploads the schema of each one. With exactly one selected, the schema is
+        linked back to it.
+      </p>
+      @let configsError = form.controls.credentialConfigIds.invalid &&
+      form.controls.credentialConfigIds.touched;
+      <div class="mt-4">
+        @if (configs.isPending()) {
+        <hlm-skeleton class="h-16 w-full rounded-lg" />
+        } @else if (configs.isError()) {
+        <p class="text-destructive text-sm" role="alert">
+          The credential types could not be loaded.
+          <button
+            hlmBtn
+            variant="link"
+            size="sm"
+            type="button"
+            class="h-auto p-0"
+            (click)="configs.refetch()"
+          >
+            Retry
+          </button>
+        </p>
+        } @else if (!configList().length) {
+        <p class="text-muted-foreground text-sm">
+          There is no credential type yet.
+          <a class="text-primary font-medium hover:underline" routerLink="/credential-config"
+            >Create one first.</a
+          >
+        </p>
+        } @else {
+        <div
+          class="grid gap-1.5 rounded-xl sm:grid-cols-2"
+          [class.ring-destructive]="configsError"
+          [class.ring-1]="configsError"
+          [class.p-1]="configsError"
+        >
+          @for (config of configList(); track config.id) {
+          <label
+            class="has-[[data-state=checked]]:border-primary/40 has-[[data-state=checked]]:bg-primary/5 hover:bg-muted/60 flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5"
+            [for]="'config-' + config.id"
+          >
+            <hlm-checkbox
+              class="mt-0.5"
+              [inputId]="'config-' + config.id"
+              [checked]="selectedConfigs().includes(config.id)"
+              [attr.aria-invalid]="configsError || null"
+              (checkedChange)="toggle('credentialConfigIds', config.id, $event === true)"
+            />
+            <span class="min-w-0">
+              <span class="block truncate text-sm font-medium">{{ configName(config) }}</span>
+              <span class="text-muted-foreground block truncate text-xs"
+                >{{ formatLabels[config.config.format] ?? config.config.format }} ·
+                <span class="font-mono">{{ config.id }}</span></span
+              >
+            </span>
+          </label>
+          }
+        </div>
+        } @if (configsError) {
+        <p class="text-destructive mt-2 text-sm">Select at least one credential type.</p>
+        }
+      </div>
+    </fieldset>
+
+    @if (existing(); as conflict) {
+    <div
+      class="border-warning/30 bg-warning/8 mt-4 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm"
+      role="note"
+    >
+      <ng-icon name="lucideTriangleAlert" class="text-warning mt-0.5 shrink-0" aria-hidden="true" />
+      <p>
+        <span class="font-medium">{{ configName(conflict.config) }}</span> is linked to the schema
+        <a
+          class="font-mono break-all underline-offset-2 hover:underline"
+          [routerLink]="['/schema', conflict.routeId]"
+          >{{ conflict.schemaId }}</a
+        >
+        already. Publish a new version of that schema, or unlink it from the credential type first.
+      </p>
+    </div>
+    }
+  </section>
+
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="authorities-heading"
+  >
+    <h2 id="authorities-heading" class="font-semibold">Trusted authorities</h2>
+    <p class="text-muted-foreground mt-1 text-sm">
+      Who wallets and relying parties accept as issuers: your trust lists, published with their URL
+      and certificate, or root certificates. Add at least one.
+    </p>
+    @let authorityError = form.hasError('trustedAuthority') && form.controls.trustListIds.touched;
+
+    <fieldset class="mt-4 min-w-0">
+      <legend class="mb-2 text-sm font-medium">Trust lists</legend>
+      @if (trustLists.isPending()) {
+      <hlm-skeleton class="h-14 w-full rounded-lg" />
+      } @else if (trustLists.isError()) {
+      <p class="text-muted-foreground text-sm">
+        The trust lists could not be loaded; add a root certificate instead.
+        <button
+          hlmBtn
+          variant="link"
+          size="sm"
+          type="button"
+          class="h-auto p-0"
+          (click)="trustLists.refetch()"
+        >
+          Retry
+        </button>
+      </p>
+      } @else if (!trustListList().length) {
+      <p class="text-muted-foreground text-sm">
+        There is no trust list; add a root certificate, or
+        <a class="text-primary font-medium hover:underline" routerLink="/trust-list/create"
+          >create a trust list</a
+        >.
+      </p>
+      } @else {
+      <div class="grid gap-1.5 sm:grid-cols-2">
+        @for (list of trustListList(); track list.id) {
+        <label
+          class="has-[[data-state=checked]]:border-primary/40 has-[[data-state=checked]]:bg-primary/5 hover:bg-muted/60 flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5"
+          [for]="'trust-list-' + list.id"
+        >
+          <hlm-checkbox
+            class="mt-0.5"
+            [inputId]="'trust-list-' + list.id"
+            [checked]="selectedTrustLists().includes(list.id)"
+            [attr.aria-invalid]="authorityError || null"
+            (checkedChange)="toggle('trustListIds', list.id, $event === true)"
+          />
+          <span class="min-w-0">
+            <span class="block truncate text-sm font-medium">{{ trustListName(list) }}</span>
+            <span class="text-muted-foreground block truncate font-mono text-xs"
+              >{{ list.id }}</span
+            >
+          </span>
+        </label>
+        }
+      </div>
+      }
+    </fieldset>
+
+    <fieldset class="mt-5 min-w-0" formArrayName="rootCertificates">
+      <legend class="mb-2 text-sm font-medium">Root certificates</legend>
+      <div class="grid gap-4">
+        @for (control of form.controls.rootCertificates.controls; track control; let index = $index)
+        {
+        <hlm-field class="gap-2">
+          <div class="flex items-center justify-between gap-2">
+            <label hlmFieldLabel [for]="'root-certificate-' + index"
+              >Root certificate {{ index + 1 }}</label
+            >
+            <button
+              hlmBtn
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              class="text-muted-foreground hover:text-destructive"
+              [attr.aria-label]="'Remove root certificate ' + (index + 1)"
+              hlmTooltip="Remove"
+              (click)="removeRootCertificate(index)"
+            >
+              <ng-icon name="lucideTrash2" />
+            </button>
+          </div>
+          <textarea
+            hlmTextarea
+            class="min-h-24 font-mono text-xs"
+            [id]="'root-certificate-' + index"
+            [formControlName]="index"
+            rows="4"
+            spellcheck="false"
+            placeholder="-----BEGIN CERTIFICATE-----&#10;MIIB…&#10;-----END CERTIFICATE-----"
+          ></textarea>
+          <p hlmFieldDescription>PEM or base64 DER, one certificate.</p>
+          <hlm-field-error validator="required"
+            >Paste the root certificate or remove this entry.</hlm-field-error
+          >
+          <hlm-field-error validator="certificate"
+            >Paste a certificate in PEM or base64 DER.</hlm-field-error
+          >
+          <hlm-field-error validator="multipleCertificates"
+            >Paste only the root certificate, not a chain.</hlm-field-error
+          >
+        </hlm-field>
+        }
+        <div>
+          <button
+            #addCertificate
+            hlmBtn
+            variant="outline"
+            size="sm"
+            type="button"
+            (click)="addRootCertificate()"
+          >
+            <ng-icon name="lucidePlus" aria-hidden="true" />
+            Add root certificate
+          </button>
+        </div>
+      </div>
+    </fieldset>
+    @if (authorityError) {
+    <p class="text-destructive mt-3 text-sm" role="alert">
+      Select a trust list or add a root certificate.
+    </p>
+    }
+  </section>
+
+  <div class="flex flex-wrap items-center justify-end gap-3">
+    <a hlmBtn variant="ghost" routerLink="/schema">Cancel</a>
+    <button
+      hlmBtn
+      type="submit"
+      [attr.aria-disabled]="publishSchema.isPending() || null"
+      [attr.aria-busy]="publishSchema.isPending() || null"
+    >
+      @if (publishSchema.isPending()) {
+      <hlm-spinner class="size-4" />
+      Publishing… } @else {
+      <ng-icon name="lucideUpload" aria-hidden="true" />
+      Publish schema }
+    </button>
+  </div>
+</form>

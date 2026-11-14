@@ -151,8 +151,13 @@ const STATUS: Record<
             <ng-icon name="lucideExternalLink" aria-hidden="true" />
             Open in a wallet on this device
           </a>
-          <a hlmBtn variant="ghost" [routerLink]="['/session-management', offer().session]">
-            Session details
+          <a
+            hlmBtn
+            variant="ghost"
+            routerLink="/session-management"
+            [queryParams]="{ q: offer().session }"
+          >
+            View session in list
           </a>
           <button hlmBtn variant="ghost" type="button" (click)="another.emit()">
             <ng-icon name="lucideRotateCcw" aria-hidden="true" />

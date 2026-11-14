@@ -1,20 +1,4 @@
-import type { AttributeProviderEntity, CredentialConfig } from '@eudiplo/sdk-core';
-
-/** How the provider authenticates: "API key in X-API-Key", or "None". */
-export function authLabel(provider: Pick<AttributeProviderEntity, 'auth'>): string {
-  const auth = provider.auth as { type?: string; config?: { headerName?: string } } | undefined;
-  if (auth?.type !== 'apiKey') return 'None';
-  return auth.config?.headerName ? `API key in ${auth.config.headerName}` : 'API key';
-}
-
-/** The URL's host, to tell providers apart at a glance; the URL itself when it has none. */
-export function hostOf(url: string): string {
-  try {
-    return new URL(url).host || url;
-  } catch {
-    return url;
-  }
-}
+import type { CredentialConfig } from '@eudiplo/sdk-core';
 
 /** The credential types that fetch their claims from each provider, by provider ID. */
 export function usersByProvider(

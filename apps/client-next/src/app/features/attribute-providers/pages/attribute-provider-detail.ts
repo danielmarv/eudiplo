@@ -36,7 +36,7 @@ import { PageHeader } from '../../../shared/pages/page-header';
 import { displayName } from '../../credential-configs/data/credential-config-display';
 import { credentialConfigsQuery } from '../../issuance/data/issuance-queries';
 import { DeleteAttributeProviderDialog } from '../components/delete-attribute-provider-dialog';
-import { hostOf } from '../data/attribute-provider-display';
+import { hostOf } from '../../../shared/api-key-endpoint/endpoint-display';
 import { attributeProviderQuery } from '../data/attribute-provider-queries';
 
 /**

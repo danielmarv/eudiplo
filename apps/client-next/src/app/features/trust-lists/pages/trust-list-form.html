@@ -1,0 +1,432 @@
+<app-page-header
+  [heading]="editing() ? 'Edit trust list' : 'Create trust list'"
+  [description]="editing() ? 'Update its signing key and trusted entities.' : 'Publish a signed list of trusted entities.'"
+>
+  <a hlmBtn variant="ghost" routerLink="/trust-list">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    All trust lists
+  </a>
+  <a
+    hlmBtn
+    variant="outline"
+    href="https://docs.eudiplo.dev/trust/trust-lists"
+    target="_blank"
+    rel="noopener"
+  >
+    Documentation
+  </a>
+</app-page-header>
+
+@if (editing() && list.isPending()) {
+<div role="status" aria-label="Loading trust list" class="grid max-w-4xl gap-4">
+  <hlm-skeleton class="h-52 rounded-2xl" />
+  <hlm-skeleton class="h-96 rounded-2xl" />
+</div>
+} @else if (editing() && list.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <h2 class="text-lg font-semibold">
+    {{ notFound(list.error()) ? 'There is no trust list ' + id() : 'The trust list could not be
+    loaded' }}
+  </h2>
+  <p class="text-muted-foreground max-w-md text-sm">
+    {{ notFound(list.error()) ? 'It may have been deleted, or the address has a typo.' :
+    errorMessage(list.error()) }}
+  </p>
+  <div class="flex flex-wrap justify-center gap-2">
+    @if (!notFound(list.error())) {
+    <button hlmBtn variant="outline" type="button" (click)="list.refetch()">Retry</button>
+    }
+    <a hlmBtn variant="ghost" routerLink="/trust-list">All trust lists</a>
+  </div>
+</section>
+} @else { @if (editing() && owner(); as currentOwner) {
+<app-ownership-notice class="mb-5 block" kind="TrustList" [resource]="currentOwner" />
+}
+
+<form #formElement [formGroup]="form" (ngSubmit)="submit()" class="grid max-w-5xl gap-5">
+  @if (locked()) {
+  <div
+    class="border-primary/20 bg-primary/5 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm"
+    role="note"
+  >
+    <ng-icon name="lucideLock" class="text-primary mt-0.5 shrink-0" aria-hidden="true" />
+    <p>{{ locked() }}. Edit the source configuration instead.</p>
+  </div>
+  }
+
+  <fieldset [disabled]="!!locked()" class="grid gap-5 disabled:opacity-70">
+    <section
+      class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6"
+    >
+      <div>
+        <h2 class="font-semibold">Basic information</h2>
+        <p class="text-muted-foreground mt-1 text-sm">Trust list identifier and signature key.</p>
+      </div>
+
+      <label class="grid gap-1.5 text-sm">
+        <span class="font-medium">ID <span class="text-destructive">*</span></span>
+        <input
+          class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+          formControlName="id"
+          autocomplete="off"
+          placeholder="e.g. pid-trust-list"
+          [readOnly]="editing()"
+          [attr.aria-invalid]="fieldError('id', 'Enter a trust list ID.') ? 'true' : null"
+        />
+        <span class="text-muted-foreground text-xs">Unique identifier for this trust list.</span>
+        @if (fieldError('id', 'Enter a trust list ID.'); as error) {
+        <span class="text-destructive text-xs" role="alert">{{ error }}</span>
+        }
+      </label>
+
+      <label class="grid gap-1.5 text-sm">
+        <span class="font-medium">Description</span>
+        <input
+          class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+          formControlName="description"
+          placeholder="e.g. Issuers accepted for membership checks"
+        />
+      </label>
+
+      <label class="grid gap-1.5 text-sm">
+        <span class="font-medium">Signing key chain</span>
+        <select
+          class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 h-10"
+          formControlName="keyChainId"
+          [attr.aria-invalid]="fieldError('keyChainId', '') ? 'true' : null"
+        >
+          <option value="">
+            {{ editing() ? 'Keep the current key chain' : 'Use a trust list key chain from this
+            tenant' }}
+          </option>
+          @if (form.controls.keyChainId.value && unlistedKeyChain(form.controls.keyChainId.value,
+          'trustList'); as unlisted) {
+          <option [value]="unlisted.id">{{ unlisted.label }}</option>
+          } @for (chain of chainsFor('trustList'); track chain.id) {
+          <option [value]="chain.id">{{ keyChainLabel(chain) }}</option>
+          }
+        </select>
+        <span class="text-muted-foreground text-xs">
+          The selected trust list key chain signs the published JWT.
+        </span>
+        @if (fieldError('keyChainId', 'Select a trust list key chain.'); as error) {
+        <span class="text-destructive text-xs" role="alert">{{ error }}</span>
+        } @if (keyChains.isPending()) {
+        <span class="text-muted-foreground text-xs" role="status">Loading key chains…</span>
+        } @else if (keyChains.isError()) {
+        <span class="text-destructive text-xs" role="alert">
+          Key chains could not be loaded.
+          <button
+            hlmBtn
+            variant="link"
+            size="sm"
+            type="button"
+            class="h-auto p-0"
+            (click)="keyChains.refetch()"
+          >
+            Retry
+          </button>
+        </span>
+        } @else if (!chainsFor('trustList').length) {
+        <span class="text-muted-foreground text-xs">
+          No trust list key chains are available.
+          <a
+            class="text-primary underline"
+            routerLink="/keys/create"
+            [queryParams]="{ usage: 'trustList' }"
+            target="_blank"
+            rel="noopener"
+          >
+            Create a trust list key chain (opens in a new tab)
+          </a>
+        </span>
+        }
+      </label>
+    </section>
+
+    <section
+      class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6"
+    >
+      <div>
+        <h2 class="font-semibold">Trusted entities</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          Add at least one issuer. Internal entities use key chains already in this tenant; external
+          entities use pasted PEM certificates.
+        </p>
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        <button
+          hlmBtn
+          variant="outline"
+          type="button"
+          #addEntityButton
+          (click)="addEntity('internal')"
+        >
+          <ng-icon name="lucidePlus" aria-hidden="true" />
+          Add internal entity
+        </button>
+        <button hlmBtn variant="outline" type="button" (click)="addEntity('external')">
+          <ng-icon name="lucidePlus" aria-hidden="true" />
+          Add external entity
+        </button>
+      </div>
+
+      @if (!entities.length) {
+      <p class="bg-muted/50 text-muted-foreground rounded-xl p-4 text-sm">
+        No entities added. Add an internal or external trusted entity to continue.
+      </p>
+      }
+
+      <div formArrayName="entities" class="grid gap-4">
+        @for (entity of entities.controls; track entity; let i = $index) {
+        <section
+          [formGroupName]="i"
+          class="grid gap-4 rounded-xl border p-4 sm:p-5"
+          [attr.aria-labelledby]="'entity-heading-' + i"
+        >
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 #entityHeading tabindex="-1" [id]="'entity-heading-' + i" class="font-semibold">
+                {{ entity.controls.type.value === 'internal' ? 'Internal' : 'External' }} entity {{
+                i + 1 }} @if (entity.controls.infoName.value) { · {{ entity.controls.infoName.value
+                }} }
+              </h3>
+              <p class="text-muted-foreground mt-1 text-xs">
+                {{ entity.controls.type.value === 'internal' ? 'System key chains' : 'PEM
+                certificates' }}
+              </p>
+            </div>
+            <button
+              hlmBtn
+              variant="ghost"
+              size="sm"
+              type="button"
+              class="text-destructive"
+              [attr.aria-label]="'Remove entity ' + (i + 1)"
+              (click)="removeEntity(i)"
+            >
+              <ng-icon name="lucideTrash2" aria-hidden="true" />
+              Remove
+            </button>
+          </div>
+
+          <label class="grid gap-1.5 text-sm">
+            <span class="font-medium">Provider type</span>
+            <select
+              class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 h-10"
+              formControlName="providerType"
+            >
+              <option value="attestation-provider">Credential provider</option>
+              <option value="wallet-provider">Wallet provider</option>
+            </select>
+          </label>
+
+          @if (entity.controls.type.value === 'internal') {
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="grid gap-1.5 text-sm">
+              <span class="font-medium"
+                >Issuer key chain <span class="text-destructive">*</span></span
+              >
+              <select
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 h-10"
+                formControlName="issuerKeyChainId"
+              >
+                <option value="">Select a credential signing key chain</option>
+                @if (entity.controls.issuerKeyChainId.value &&
+                unlistedKeyChain(entity.controls.issuerKeyChainId.value, 'attestation'); as
+                unlisted) {
+                <option [value]="unlisted.id">{{ unlisted.label }}</option>
+                } @for (chain of chainsFor('attestation'); track chain.id) {
+                <option [value]="chain.id">{{ keyChainLabel(chain) }}</option>
+                }
+              </select>
+              @if (fieldError('entities.' + i + '.issuerKeyChainId', 'Select a credential signing
+              key chain.'); as error) {
+              <span class="text-destructive text-xs" role="alert">{{ error }}</span>
+              }
+            </label>
+            <label class="grid gap-1.5 text-sm">
+              <span class="font-medium"
+                >Revocation key chain <span class="text-destructive">*</span></span
+              >
+              <select
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 h-10"
+                formControlName="revocationKeyChainId"
+              >
+                <option value="">Select a status list or credential signing key chain</option>
+                @if (entity.controls.revocationKeyChainId.value &&
+                unlistedKeyChain(entity.controls.revocationKeyChainId.value, 'statusList'); as
+                unlisted) {
+                <option [value]="unlisted.id">{{ unlisted.label }}</option>
+                } @for (chain of chainsFor('statusList'); track chain.id) {
+                <option [value]="chain.id">{{ keyChainLabel(chain) }}</option>
+                }
+              </select>
+              @if (fieldError('entities.' + i + '.revocationKeyChainId', 'Select a status list or
+              credential signing key chain.'); as error) {
+              <span class="text-destructive text-xs" role="alert">{{ error }}</span>
+              }
+            </label>
+          </div>
+          }
+
+          <div class="grid gap-4 sm:grid-cols-2">
+            <label class="grid gap-1.5 text-sm">
+              <span class="font-medium">Entity name <span class="text-destructive">*</span></span>
+              <input
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+                formControlName="infoName"
+              />
+              @if (fieldError('entities.' + i + '.infoName', 'Enter an entity name.'); as error) {
+              <span class="text-destructive text-xs" role="alert">{{ error }}</span>
+              }
+            </label>
+            <label class="grid gap-1.5 text-sm">
+              <span class="font-medium">Language</span>
+              <input
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+                formControlName="infoLang"
+                placeholder="en"
+              />
+            </label>
+            <label class="grid gap-1.5 text-sm sm:col-span-2">
+              <span class="font-medium">Information URI</span>
+              <input
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+                formControlName="infoUri"
+                placeholder="https://example.com/about"
+              />
+              @if (fieldError('entities.' + i + '.infoUri', ''); as error) {
+              <span class="text-destructive text-xs" role="alert">{{ error }}</span>
+              }
+            </label>
+            <label class="grid gap-1.5 text-sm">
+              <span class="font-medium">Country</span>
+              <input
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+                formControlName="infoCountry"
+                placeholder="DE"
+              />
+            </label>
+            <label class="grid gap-1.5 text-sm">
+              <span class="font-medium">Locality</span>
+              <input
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+                formControlName="infoLocality"
+              />
+            </label>
+            <label class="grid gap-1.5 text-sm">
+              <span class="font-medium">Postal code</span>
+              <input
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+                formControlName="infoPostalCode"
+              />
+            </label>
+            <label class="grid gap-1.5 text-sm">
+              <span class="font-medium">Street address</span>
+              <input
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+                formControlName="infoStreetAddress"
+              />
+            </label>
+            <label class="grid gap-1.5 text-sm">
+              <span class="font-medium"
+                >E-mail address <span class="text-destructive">*</span></span
+              >
+              <input
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+                type="email"
+                formControlName="infoContactUri"
+                placeholder="info@example.com"
+              />
+              @if (fieldError('entities.' + i + '.infoContactUri', 'Enter an e-mail address.'); as
+              error) {
+              <span class="text-destructive text-xs" role="alert">{{ error }}</span>
+              }
+            </label>
+            <label class="grid gap-1.5 text-sm">
+              <span class="font-medium">Website <span class="text-destructive">*</span></span>
+              <input
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+                type="url"
+                formControlName="infoWebsite"
+                placeholder="https://example.com/"
+              />
+              @if (fieldError('entities.' + i + '.infoWebsite', 'Enter a website URL.'); as error) {
+              <span class="text-destructive text-xs" role="alert">{{ error }}</span>
+              }
+            </label>
+            <label class="grid gap-1.5 text-sm sm:col-span-2">
+              <span class="font-medium">Telephone</span>
+              <input
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground h-10"
+                type="tel"
+                formControlName="infoPhone"
+                placeholder="+49-30-1234567"
+              />
+              @if (fieldError('entities.' + i + '.infoPhone', ''); as error) {
+              <span class="text-destructive text-xs" role="alert">{{ error }}</span>
+              }
+            </label>
+          </div>
+
+          @if (entity.controls.type.value === 'external') {
+          <div class="grid gap-4 border-t pt-4 sm:grid-cols-2">
+            <label class="grid gap-1.5 text-sm">
+              <span class="font-medium"
+                >Issuer certificate (PEM) <span class="text-destructive">*</span></span
+              >
+              <textarea
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground min-h-40 py-2 font-mono text-xs"
+                formControlName="issuerCertPem"
+                aria-label="Issuer certificate PEM"
+              ></textarea>
+              @if (fieldError('entities.' + i + '.issuerCertPem', 'Paste the issuer certificate.');
+              as error) {
+              <span class="text-destructive text-xs" role="alert">{{ error }}</span>
+              }
+            </label>
+            <label class="grid gap-1.5 text-sm">
+              <span class="font-medium"
+                >Revocation certificate (PEM) <span class="text-destructive">*</span></span
+              >
+              <textarea
+                class="dark:bg-input/30 border-input focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:border-destructive placeholder:text-muted-foreground w-full min-w-0 rounded-md border bg-transparent px-2.5 text-sm shadow-xs outline-none focus-visible:ring-3 read-only:bg-muted/50 read-only:text-muted-foreground min-h-40 py-2 font-mono text-xs"
+                formControlName="revocationCertPem"
+                aria-label="Revocation certificate PEM"
+              ></textarea>
+              @if (fieldError('entities.' + i + '.revocationCertPem', 'Paste the revocation
+              certificate.'); as error) {
+              <span class="text-destructive text-xs" role="alert">{{ error }}</span>
+              }
+            </label>
+          </div>
+          }
+        </section>
+        }
+      </div>
+      @if (submitted() && !entities.length) {
+      <p class="text-destructive text-sm" role="alert">Add at least one trusted entity.</p>
+      }
+    </section>
+  </fieldset>
+
+  <div class="flex flex-wrap justify-end gap-2">
+    <a hlmBtn variant="ghost" routerLink="/trust-list">Cancel</a>
+    @if (locked()) {
+    <button hlmBtn type="button" aria-disabled="true" [hlmTooltip]="locked()">
+      <ng-icon name="lucideLock" aria-hidden="true" />
+      {{ editing() ? 'Save changes' : 'Create trust list' }}
+    </button>
+    } @else {
+    <button hlmBtn type="submit" [attr.aria-disabled]="saving() || null">
+      {{ saving() ? 'Saving…' : editing() ? 'Save changes' : 'Create trust list' }}
+    </button>
+    }
+  </div>
+</form>
+}

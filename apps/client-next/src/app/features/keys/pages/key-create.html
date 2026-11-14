@@ -1,0 +1,468 @@
+<app-page-header
+  heading="Create key"
+  description="Choose a key’s purpose and how its key and certificate are managed."
+>
+  <a hlmBtn variant="ghost" routerLink="/keys"
+    ><ng-icon name="lucideArrowLeft" aria-hidden="true" />Keys</a
+  >
+</app-page-header>
+
+<nav class="mb-6 max-w-4xl text-sm" aria-label="Key creation steps">
+  <ol class="flex items-center gap-2">
+    @for (item of steps; track item.id; let last = $last) {
+    <li
+      class="flex items-center gap-2"
+      [class.flex-1]="!last"
+      [attr.aria-current]="item.current ? 'step' : null"
+    >
+      <span
+        class="grid size-7 shrink-0 place-items-center rounded-full text-xs font-semibold"
+        [class]="item.current ? 'bg-primary text-primary-foreground' : item.done ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'"
+      >
+        @if (item.done) { <ng-icon name="lucideCheck" aria-hidden="true" /><span class="sr-only"
+          >Done:
+        </span>
+        } @else { {{ item.number }} }
+      </span>
+      <span class="whitespace-nowrap" [class.text-muted-foreground]="!item.current"
+        >{{ item.label }}</span
+      >
+      @if (!last) { <span class="bg-border h-px flex-1" aria-hidden="true"></span> }
+    </li>
+    }
+  </ol>
+</nav>
+
+@if (step() === 'usage') {
+<section
+  class="bg-card max-w-4xl rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+  [formGroup]="usageForm"
+>
+  <h2 class="font-semibold">What will this key be used for?</h2>
+  <p class="text-muted-foreground mt-1 mb-5 text-sm">
+    Choose the primary purpose; this determines which options are available.
+  </p>
+  <div class="grid gap-3 md:grid-cols-2">
+    @for (usage of keyUsages; track usage.value) {
+    <label
+      class="has-checked:border-primary has-checked:bg-primary/5 flex cursor-pointer gap-3 rounded-xl border p-4 hover:bg-muted/40"
+    >
+      <input
+        type="radio"
+        class="mt-1 accent-primary"
+        formControlName="usage"
+        [value]="usage.value"
+      />
+      <span>
+        <span class="block font-medium">{{ usage.label }}</span>
+        <span class="text-muted-foreground mt-1 block text-sm">{{ usage.description }}</span>
+      </span>
+    </label>
+    }
+  </div>
+  <div class="mt-6 flex justify-end">
+    <button
+      hlmBtn
+      type="button"
+      [attr.aria-disabled]="!usageForm.controls.usage.value"
+      (click)="nextFromUsage()"
+    >
+      Choose key setup <ng-icon name="lucideArrowRight" aria-hidden="true" />
+    </button>
+  </div>
+</section>
+} @if (step() === 'strategy') {
+<section
+  class="bg-card max-w-4xl rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+>
+  @if (activeUsage() === 'access') {
+  <h2 class="font-semibold">How will you get the access certificate?</h2>
+  <p class="text-muted-foreground mt-1 mb-5 text-sm">
+    Choose a self-signed certificate, registrar enrollment, or an external CA.
+  </p>
+  <div class="grid gap-3 md:grid-cols-3" [formGroup]="strategyForm">
+    @for (source of [ { value: 'selfSigned', label: 'Self-signed', detail: 'For development and
+    testing.' }, { value: 'registrar', label: 'Registrar enrollment', detail: 'Obtain a trusted
+    access certificate.' }, { value: 'external', label: 'External certificate', detail: 'Import a
+    key or create a CSR.' } ]; track source.value) {
+    <label
+      class="has-checked:border-primary has-checked:bg-primary/5 flex cursor-pointer gap-3 rounded-xl border p-4"
+    >
+      <input
+        type="radio"
+        class="mt-1 accent-primary"
+        formControlName="certificateSource"
+        [value]="source.value"
+        [disabled]="source.value === 'registrar' && !canUseRegistrar"
+      />
+      <span
+        ><span class="block font-medium">{{ source.label }}</span
+        ><span class="text-muted-foreground mt-1 block text-sm">{{ source.detail }}</span></span
+      >
+    </label>
+    }
+  </div>
+  @if (selectedCertificateSource() === 'registrar') { @if (!canUseRegistrar) {
+  <p class="text-destructive mt-4 text-sm" role="alert">
+    Enrolling through the registrar needs the registrar:manage role.
+  </p>
+  } @else if (registrar.isPending()) {
+  <p class="text-muted-foreground mt-4 text-sm" role="status">Checking registrar configuration…</p>
+  } @else if (registrar.isError()) {
+  <div class="mt-4 flex flex-wrap items-center gap-2 text-sm" role="alert">
+    <span class="text-destructive"
+      >{{ getApiErrorMessage(registrar.error(), 'Could not check the registrar configuration')
+      }}</span
+    >
+    <button hlmBtn variant="link" type="button" (click)="registrar.refetch()">Retry</button>
+  </div>
+  } @else if (!registrar.data()) {
+  <p class="text-destructive mt-4 text-sm">
+    Registrar credentials are not configured. Configure them before enrollment.
+  </p>
+  } @else {
+  <p class="text-muted-foreground mt-4 text-sm" role="status">
+    Registrar configured. Its credentials are checked when you enroll.
+  </p>
+  @if (!registrar.data()?.relyingPartyContact?.email &&
+  !registrar.data()?.relyingPartyContact?.phone &&
+  !registrar.data()?.relyingPartyContact?.supportUri) {
+  <p class="bg-muted/50 mt-3 rounded-lg p-3 text-sm">
+    No relying party contact is set; the first enrollment needs one. Add a contact in registrar
+    settings.
+  </p>
+  } } } } @else {
+  <h2 class="font-semibold">What type of key do you need?</h2>
+  <p class="text-muted-foreground mt-1 mb-5 text-sm">
+    An internal chain is recommended. Its root CA remains stable when the signing key rotates.
+  </p>
+  <div class="grid gap-3 md:grid-cols-3" [formGroup]="strategyForm">
+    @for (type of [ { value: 'internalChain', label: 'Internal chain', detail: 'EUDIPLO creates a
+    root CA and signing key.' }, { value: 'standalone', label: 'Standalone key', detail: 'A
+    self-signed key with a manually managed certificate.' }, { value: 'externalCaChain', label:
+    'External CA chain', detail: 'Import your CA key and certificate; EUDIPLO creates the signer.' }
+    ]; track type.value) {
+    <label
+      class="has-checked:border-primary has-checked:bg-primary/5 flex cursor-pointer gap-3 rounded-xl border p-4"
+    >
+      <input
+        type="radio"
+        class="mt-1 accent-primary"
+        formControlName="keyChainType"
+        [value]="type.value"
+      />
+      <span
+        ><span class="block font-medium">{{ type.label }}</span
+        ><span class="text-muted-foreground mt-1 block text-sm">{{ type.detail }}</span></span
+      >
+    </label>
+    }
+  </div>
+  }
+  <div class="mt-6 flex justify-between">
+    <button hlmBtn variant="ghost" type="button" (click)="back()">
+      <ng-icon name="lucideArrowLeft" aria-hidden="true" />Back
+    </button>
+    <button hlmBtn type="button" (click)="nextFromStrategy()">
+      Configure key <ng-icon name="lucideArrowRight" aria-hidden="true" />
+    </button>
+  </div>
+</section>
+} @if (step() === 'configure') { @if (providers.isPending()) {
+<div class="grid max-w-4xl gap-3" role="status" aria-label="Loading KMS providers">
+  <hlm-skeleton class="h-20 rounded-xl" />
+  <hlm-skeleton class="h-56 rounded-xl" />
+</div>
+} @else if (providers.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-14 text-center"
+  role="alert"
+>
+  <ng-icon name="lucideCircleAlert" class="text-destructive text-xl" aria-hidden="true" />
+  <p class="font-semibold">KMS providers could not be loaded</p>
+  <p class="text-muted-foreground text-sm">{{ errorMessage(providers.error()) }}</p>
+  <button hlmBtn variant="outline" type="button" (click)="providers.refetch()">Retry</button>
+</section>
+} @else {
+<form #formElement class="grid max-w-4xl gap-5" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  <section class="bg-card rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8">
+    <h2 class="font-semibold">Key settings</h2>
+    @if (isExternalCaChain) {
+    <p class="text-muted-foreground mt-1 text-sm">
+      Import the external CA key and certificate. EUDIPLO creates a signing key under it.
+    </p>
+    } @else if (requestsCertificate) {
+    <p class="text-muted-foreground mt-1 text-sm">
+      EUDIPLO creates the key. Request a CSR from its details page and store the certificate your CA
+      issues.
+    </p>
+    } @else if (importsExternalKey) {
+    <p class="text-muted-foreground mt-1 text-sm">
+      Import the private key and the certificate chain that was issued for it.
+    </p>
+    } @else if (activeUsage() === 'access' && selectedCertificateSource() === 'registrar') {
+    <p class="text-muted-foreground mt-1 text-sm">
+      Create a key and enroll it with the registrar in one request. A refusal does not leave a
+      self-signed key behind.
+    </p>
+    }
+    <div class="mt-5 grid gap-5 md:grid-cols-2">
+      <hlm-field class="content-start gap-2 md:col-span-2">
+        <label hlmFieldLabel for="key-description">Description</label>
+        <input
+          hlmInput
+          id="key-description"
+          class="h-10"
+          formControlName="description"
+          placeholder="Optional description"
+        />
+        <p hlmFieldDescription>Defaults to {{ defaultDescription }}.</p>
+      </hlm-field>
+      <div class="grid content-start gap-2">
+        <label class="text-sm font-medium" for="key-provider">KMS provider</label>
+        <hlm-native-select
+          class="w-full"
+          selectClass="h-10"
+          selectId="key-provider"
+          formControlName="kmsProvider"
+          (change)="onProviderChange()"
+        >
+          @for (provider of providers.data()?.providers ?? []; track provider.name) {
+          <option [value]="provider.name">{{ provider.name }} ({{ provider.type }})</option>
+          }
+        </hlm-native-select>
+        @if (providers.data()?.providers?.length === 0) {
+        <p class="text-destructive text-sm">No KMS providers are available.</p>
+        } @else {
+        <p class="text-muted-foreground text-sm">This provider stores and signs with the key.</p>
+        }
+      </div>
+      @if (showAlgorithm) {
+      <div class="grid content-start gap-2">
+        <label class="text-sm font-medium" for="key-algorithm">Signing algorithm</label>
+        <hlm-native-select
+          class="w-full"
+          selectClass="h-10"
+          selectId="key-algorithm"
+          formControlName="alg"
+        >
+          @for (algorithm of algorithms; track algorithm.value) {
+          <option [value]="algorithm.value">{{ algorithm.label }}</option>
+          }
+        </hlm-native-select>
+        <p class="text-muted-foreground text-sm">
+          The algorithm also selects the key curve. Wallets are only required to support ES256.
+        </p>
+      </div>
+      }
+    </div>
+
+    @if ((activeUsage() === 'attestation' || activeUsage() === 'statusList') &&
+    selectedKeyChainType() === 'standalone') {
+    <label class="mt-5 flex items-center gap-2 text-sm">
+      <input type="checkbox" class="accent-primary" formControlName="useExternalCertificate" />
+      Use a certificate from an external CA
+    </label>
+    } @if (isExternalCertificate && !isExternalCaChain) {
+    <fieldset class="mt-5 grid gap-2">
+      <legend class="text-sm font-medium">Where does the key come from?</legend>
+      <label class="flex items-start gap-2 text-sm"
+        ><input
+          type="radio"
+          class="mt-1 accent-primary"
+          formControlName="externalCertificateMode"
+          value="import"
+        />Import a private key and its certificate chain</label
+      >
+      <label class="flex items-start gap-2 text-sm"
+        ><input
+          type="radio"
+          class="mt-1 accent-primary"
+          formControlName="externalCertificateMode"
+          value="csr"
+        />Create the key here and request its certificate with a CSR</label
+      >
+    </fieldset>
+    } @if (importsExternalKey) {
+    <div class="mt-5 grid gap-5">
+      @if (!providerCanImport) {
+      <p class="text-destructive text-sm" role="alert">
+        The selected KMS provider does not support importing keys.
+      </p>
+      }
+      <hlm-field class="gap-2">
+        <label hlmFieldLabel for="external-private-key"
+          >{{ isExternalCaChain ? 'External CA private key' : 'External private key' }} (JWK or
+          PKCS#8 PEM)</label
+        >
+        <textarea
+          hlmInput
+          id="external-private-key"
+          class="min-h-36 font-mono text-xs"
+          formControlName="externalPrivateKey"
+          autocomplete="off"
+          spellcheck="false"
+          aria-describedby="private-key-hint"
+        ></textarea>
+        <p id="private-key-hint" hlmFieldDescription>
+          Must match the public key in the {{ isExternalCaChain ? 'CA' : 'leaf' }} certificate. Key
+          material is sent only to the import endpoint and is never logged or rendered elsewhere.
+        </p>
+        <hlm-field-error validator="required">Paste or load the private key.</hlm-field-error>
+        <input
+          #privateKeyFile
+          type="file"
+          accept=".json,.jwk,.pem,.key,application/json,application/x-pem-file"
+          class="sr-only"
+          aria-label="Load an external private key file"
+          (change)="loadPrivateKey($event)"
+        />
+        <button
+          hlmBtn
+          variant="outline"
+          type="button"
+          class="w-fit"
+          (click)="privateKeyFile.click()"
+        >
+          <ng-icon name="lucideUpload" aria-hidden="true" />Load key file
+        </button>
+      </hlm-field>
+      <hlm-field class="gap-2">
+        <label hlmFieldLabel for="external-certificate"
+          >{{ isExternalCaChain ? 'External CA certificate chain' : 'Certificate chain' }}
+          (PEM)</label
+        >
+        <textarea
+          hlmInput
+          id="external-certificate"
+          class="min-h-36 font-mono text-xs"
+          formControlName="externalCertificate"
+          spellcheck="false"
+        ></textarea>
+        <p hlmFieldDescription>
+          {{ isExternalCaChain ? 'The last certificate must be the CA certificate matching the
+          supplied key.' : 'Paste the leaf certificate first, followed by any issuing certificates.'
+          }} Or load certificate files.
+        </p>
+        <hlm-field-error validator="required">Paste or load the certificate chain.</hlm-field-error>
+        <input
+          #certificateFiles
+          type="file"
+          accept=".pem,.crt,.cer,.der,application/x-pem-file,application/pkix-cert"
+          multiple
+          class="sr-only"
+          aria-label="Load certificate chain files"
+          (change)="loadCertificates($event)"
+        />
+        <button
+          hlmBtn
+          variant="outline"
+          type="button"
+          class="w-fit"
+          (click)="certificateFiles.click()"
+        >
+          <ng-icon name="lucideUpload" aria-hidden="true" />Load certificate files
+        </button>
+      </hlm-field>
+    </div>
+    }
+  </section>
+
+  @if (isInternalChain) {
+  <section class="bg-card rounded-2xl p-5 shadow-sm ring-1 ring-black/5 sm:p-6 dark:ring-white/8">
+    <h2 class="font-semibold">Rotation policy</h2>
+    <p class="text-muted-foreground mt-1 mb-4 text-sm">
+      The root CA does not rotate. The signing key and its certificate rotate together.
+    </p>
+    <label class="flex items-center gap-2 text-sm"
+      ><input type="checkbox" class="accent-primary" formControlName="rotationEnabled" />Enable
+      automatic key rotation</label
+    >
+    <div class="mt-4 grid gap-5 sm:grid-cols-2">
+      @if (form.controls.rotationEnabled.value) {
+      <hlm-field class="gap-2">
+        <label hlmFieldLabel for="rotation-days">Rotation interval (days)</label>
+        <input
+          hlmInput
+          id="rotation-days"
+          type="number"
+          min="1"
+          max="3650"
+          step="1"
+          formControlName="rotationIntervalDays"
+        />
+        <p hlmFieldDescription>Enter 1 to 3650 days.</p>
+      </hlm-field>
+      }
+      <hlm-field class="gap-2">
+        <label hlmFieldLabel for="certificate-days">Certificate validity (days)</label>
+        <input
+          hlmInput
+          id="certificate-days"
+          type="number"
+          min="1"
+          max="3650"
+          step="1"
+          formControlName="certValidityDays"
+        />
+        <p hlmFieldDescription>Enter 1 to 3650 days.</p>
+      </hlm-field>
+    </div>
+  </section>
+  }
+
+  <section class="bg-muted/40 rounded-2xl p-5">
+    <h2 class="font-semibold">Summary</h2>
+    <dl class="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+      <div>
+        <dt class="text-muted-foreground">Usage</dt>
+        <dd class="font-medium">{{ activeUsage() }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground">Key chain type</dt>
+        <dd class="font-medium">
+          {{ isInternalChain ? (isExternalCaChain ? 'External CA chain' : 'Internal chain') :
+          'Standalone' }}
+        </dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground">KMS provider</dt>
+        <dd class="font-medium">{{ form.controls.kmsProvider.value }}</dd>
+      </div>
+      @if (isInternalChain) {
+      <div>
+        <dt class="text-muted-foreground">Rotation</dt>
+        <dd class="font-medium">
+          {{ form.controls.rotationEnabled.value ? form.controls.rotationIntervalDays.value + '
+          days' : 'Off' }}
+        </dd>
+      </div>
+      }
+    </dl>
+    @if (requestsCertificate) {
+    <p class="mt-4 flex gap-2 text-sm">
+      <ng-icon name="lucideInfo" aria-hidden="true" />After creation, request a CSR on the key
+      details page and store your CA’s certificate.
+    </p>
+    } @if (activeUsage() === 'authorizationServer' || activeUsage() === 'federation') {
+    <p class="mt-4 flex gap-2 text-sm">
+      <ng-icon name="lucideInfo" aria-hidden="true" />This key is published as a JWK; its
+      certificate is not used for signing.
+    </p>
+    }
+  </section>
+
+  <div class="flex flex-wrap justify-between gap-2">
+    <button hlmBtn variant="ghost" type="button" (click)="back()">
+      <ng-icon name="lucideArrowLeft" aria-hidden="true" />Back
+    </button>
+    <button hlmBtn type="submit" [attr.aria-disabled]="submitting() || null">
+      @if (submitting()) { <hlm-spinner class="size-4" aria-hidden="true" />Working… } @else {
+      <ng-icon
+        [name]="importsExternalKey ? 'lucideUpload' : 'lucideKeyRound'"
+        aria-hidden="true"
+      />{{ actionLabel }} }
+    </button>
+  </div>
+</form>
+} }

@@ -1,0 +1,359 @@
+<app-ownership-notice class="mb-6 block empty:hidden" kind="RegistrarConfig" [resource]="owner()" />
+
+<app-page-header
+  heading="Registrar"
+  description="The registrar of your wallet ecosystem. EUDIPLO signs in to it to register your relying party and to request access and registration certificates."
+>
+  @if (config.isSuccess()) { @if (stored()) {
+  <span
+    class="bg-success/12 text-success inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium"
+    data-testid="registrar-state"
+  >
+    <ng-icon name="lucideCircleCheck" aria-hidden="true" />
+    Connected as {{ stored()?.username }}
+  </span>
+  } @else {
+  <span
+    class="bg-muted text-muted-foreground inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium"
+    data-testid="registrar-state"
+  >
+    <ng-icon name="lucideCircleDashed" aria-hidden="true" />
+    Not configured
+  </span>
+  } }
+</app-page-header>
+
+@if (config.isPending()) {
+<div role="status" aria-label="Loading the registrar configuration" class="grid max-w-4xl gap-6">
+  <hlm-skeleton class="h-96 w-full rounded-2xl" />
+  <hlm-skeleton class="h-48 w-full rounded-2xl" />
+</div>
+} @else if (config.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  <p class="font-semibold">The registrar configuration could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(config.error()) }}</p>
+  <p class="text-muted-foreground max-w-md text-sm">
+    Saving now would replace it, so retry before making changes.
+  </p>
+  <button hlmBtn variant="outline" type="button" (click)="config.refetch()">Retry</button>
+</section>
+} @else {
+<form #formElement class="grid max-w-4xl gap-6" [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <fieldset [disabled]="!!locked()" class="grid gap-6 disabled:opacity-70">
+    <legend class="sr-only">Registrar configuration</legend>
+
+    <section
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+      aria-labelledby="connection-heading"
+    >
+      <div class="mb-5 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 id="connection-heading" class="font-semibold">Connection</h2>
+          <p class="text-muted-foreground mt-1 text-sm">
+            EUDIPLO checks that it can sign in before it saves.
+          </p>
+        </div>
+        <div class="grid gap-1">
+          <label class="sr-only" for="registrar-preset">Fill in a known registrar</label>
+          <hlm-native-select
+            class="w-56"
+            selectClass="h-9"
+            selectId="registrar-preset"
+            [value]="''"
+            (valueChange)="applyPreset($any($event))"
+          >
+            <option value="">Fill in a known registrar…</option>
+            @for (preset of presets; track preset.name) {
+            <option [value]="preset.name">{{ preset.name }}</option>
+            }
+          </hlm-native-select>
+        </div>
+      </div>
+
+      <div class="grid gap-x-6 gap-y-5 md:grid-cols-2">
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="registrar-url">Registrar URL</label>
+          <input
+            hlmInput
+            id="registrar-url"
+            class="h-10 font-mono text-sm"
+            type="url"
+            formControlName="registrarUrl"
+            placeholder="https://registrar.example.com/api"
+            spellcheck="false"
+          />
+          <p hlmFieldDescription>Base URL of the registrar API.</p>
+          <hlm-field-error validator="required">Enter the registrar URL.</hlm-field-error>
+          <hlm-field-error validator="url">Enter an http or https URL.</hlm-field-error>
+          <hlm-field-error validator="baseUrl"
+            >Enter a base URL, without query, fragment or credentials.</hlm-field-error
+          >
+        </hlm-field>
+
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="oidc-url">Sign-in URL</label>
+          <input
+            hlmInput
+            id="oidc-url"
+            class="h-10 font-mono text-sm"
+            type="url"
+            formControlName="oidcUrl"
+            placeholder="https://auth.example.com/realms/registrar"
+            spellcheck="false"
+          />
+          <p hlmFieldDescription>The OpenID Connect realm of the registrar.</p>
+          <hlm-field-error validator="required">Enter the sign-in URL.</hlm-field-error>
+          <hlm-field-error validator="url">Enter an http or https URL.</hlm-field-error>
+          <hlm-field-error validator="baseUrl"
+            >Enter a base URL, without query, fragment or credentials.</hlm-field-error
+          >
+        </hlm-field>
+
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="client-id">Client ID</label>
+          <input
+            hlmInput
+            id="client-id"
+            class="h-10"
+            formControlName="clientId"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <hlm-field-error validator="required">Enter the client ID.</hlm-field-error>
+        </hlm-field>
+
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="client-secret">Client secret</label>
+          <div class="relative">
+            <input
+              hlmInput
+              id="client-secret"
+              class="h-10 w-full pe-10 font-mono text-sm"
+              formControlName="clientSecret"
+              autocomplete="new-password"
+              spellcheck="false"
+              [type]="showSecret() ? 'text' : 'password'"
+              [placeholder]="stored()?.hasClientSecret && !urlsChanged() ? 'Stored, hidden' : 'Optional'"
+            />
+            <button
+              type="button"
+              class="text-muted-foreground hover:text-foreground absolute inset-y-0 end-0 grid w-10 place-items-center"
+              [attr.aria-label]="showSecret() ? 'Hide the client secret' : 'Show the client secret'"
+              [attr.aria-pressed]="showSecret()"
+              (click)="showSecret.set(!showSecret())"
+            >
+              <ng-icon [name]="showSecret() ? 'lucideEyeOff' : 'lucideEye'" />
+            </button>
+          </div>
+          @if (stored()?.hasClientSecret) {
+          <p hlmFieldDescription>
+            @if (urlsChanged()) { The URLs changed: enter it again, or leave it empty to remove it.
+            } @else { A secret is stored. Leave this empty to keep it. }
+          </p>
+          }
+        </hlm-field>
+
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="registrar-username">Username</label>
+          <input
+            hlmInput
+            id="registrar-username"
+            class="h-10"
+            formControlName="username"
+            autocomplete="username"
+            placeholder="user@example.com"
+          />
+          <hlm-field-error validator="required">Enter the username.</hlm-field-error>
+        </hlm-field>
+
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="registrar-password">Password</label>
+          <div class="relative">
+            <input
+              hlmInput
+              id="registrar-password"
+              class="h-10 w-full pe-10"
+              formControlName="password"
+              autocomplete="new-password"
+              [type]="showPassword() ? 'text' : 'password'"
+              [placeholder]="stored()?.hasPassword && !urlsChanged() ? 'Stored, hidden' : ''"
+            />
+            <button
+              type="button"
+              class="text-muted-foreground hover:text-foreground absolute inset-y-0 end-0 grid w-10 place-items-center"
+              [attr.aria-label]="showPassword() ? 'Hide the password' : 'Show the password'"
+              [attr.aria-pressed]="showPassword()"
+              (click)="showPassword.set(!showPassword())"
+            >
+              <ng-icon [name]="showPassword() ? 'lucideEyeOff' : 'lucideEye'" />
+            </button>
+          </div>
+          @if (stored()?.hasPassword && !urlsChanged()) {
+          <p hlmFieldDescription>A password is stored. Leave this empty to keep it.</p>
+          }
+          <hlm-field-error validator="required">
+            {{ urlsChanged() ? 'The URLs changed: enter the password again.' : 'Enter the password.'
+            }}
+          </hlm-field-error>
+        </hlm-field>
+      </div>
+    </section>
+
+    <section
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+      aria-labelledby="contact-heading"
+      id="relying-party-contact"
+    >
+      <h2 id="contact-heading" class="font-semibold">Relying party contact</h2>
+      <p class="text-muted-foreground mt-1 mb-5 text-sm">
+        Sent when EUDIPLO registers your relying party, and put in your access certificates. Set at
+        least one before you request an access certificate. A relying party that is registered
+        already keeps its contact; change it at the registrar.
+      </p>
+      <div class="grid gap-x-6 gap-y-5 md:grid-cols-3">
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="contact-support">Support URL</label>
+          <input
+            hlmInput
+            id="contact-support"
+            class="h-10"
+            type="url"
+            formControlName="supportUri"
+            placeholder="https://verifier.example/support"
+          />
+          <hlm-field-error validator="pattern">Enter an https URL.</hlm-field-error>
+        </hlm-field>
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="contact-email">Email</label>
+          <input
+            hlmInput
+            id="contact-email"
+            class="h-10"
+            type="email"
+            formControlName="email"
+            autocomplete="email"
+            placeholder="support@verifier.example"
+          />
+          <hlm-field-error validator="pattern">Enter an email address.</hlm-field-error>
+        </hlm-field>
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="contact-phone">Phone</label>
+          <input
+            hlmInput
+            id="contact-phone"
+            class="h-10"
+            type="tel"
+            formControlName="phone"
+            autocomplete="tel"
+            placeholder="+49 30 1234567"
+          />
+          <hlm-field-error validator="pattern"
+            >Use 5 to 40 digits, spaces, +, -, ( or ).</hlm-field-error
+          >
+        </hlm-field>
+      </div>
+    </section>
+
+    <section
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+      aria-labelledby="defaults-heading"
+    >
+      <h2 id="defaults-heading" class="font-semibold">Registration certificate defaults</h2>
+      <p class="text-muted-foreground mt-1 mb-5 text-sm">
+        Used for every registration certificate of this tenant; the purpose of a request belongs to
+        its presentation configuration. Other defaults, such as provides_attestations, are set
+        through the API and kept when you save.
+      </p>
+      <div class="grid gap-x-6 gap-y-5 md:grid-cols-2">
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="default-privacy">Privacy policy URL</label>
+          <input
+            hlmInput
+            id="default-privacy"
+            class="h-10"
+            type="url"
+            formControlName="privacy_policy"
+            placeholder="https://verifier.example/privacy"
+          />
+        </hlm-field>
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="default-support">Support URI</label>
+          <input
+            hlmInput
+            id="default-support"
+            class="h-10"
+            formControlName="support_uri"
+            placeholder="mailto:support@verifier.example"
+          />
+          <p hlmFieldDescription>An email, phone or web URI.</p>
+        </hlm-field>
+        <hlm-field class="content-start gap-2 md:col-span-2">
+          <label hlmFieldLabel for="default-intermediary">Intermediary relying party ID</label>
+          <input
+            hlmInput
+            id="default-intermediary"
+            class="h-10"
+            formControlName="intermediary"
+            placeholder="Optional"
+          />
+          <p hlmFieldDescription>For requests made through an intermediary relying party.</p>
+        </hlm-field>
+      </div>
+    </section>
+  </fieldset>
+
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    @if (stored() && !locked()) {
+    <button
+      hlmBtn
+      variant="ghost"
+      type="button"
+      class="hover:text-destructive"
+      [attr.aria-disabled]="saving() || deleting() || null"
+      (click)="delete()"
+    >
+      @if (deleting()) {
+      <hlm-spinner class="size-4" aria-hidden="true" />
+      } @else {
+      <ng-icon name="lucideTrash2" aria-hidden="true" />
+      } Delete configuration
+    </button>
+    } @else {
+    <span></span>
+    }
+    <div class="flex flex-wrap gap-2">
+      @if (locked()) {
+      <span id="registrar-locked" class="sr-only">{{ locked() }}</span>
+      <button
+        hlmBtn
+        type="button"
+        class="cursor-not-allowed opacity-50"
+        aria-disabled="true"
+        aria-describedby="registrar-locked"
+        [hlmTooltip]="locked()"
+      >
+        <ng-icon name="lucideLock" aria-hidden="true" />
+        Save configuration
+      </button>
+      } @else { @if (form.dirty) {
+      <button hlmBtn variant="ghost" type="button" (click)="discard()">Discard changes</button>
+      }
+      <button hlmBtn type="submit" [attr.aria-disabled]="saving() || deleting() || null">
+        @if (saving()) {
+        <hlm-spinner class="size-4" aria-hidden="true" />
+        Signing in and saving… } @else { Save configuration }
+      </button>
+      }
+    </div>
+  </div>
+</form>
+}

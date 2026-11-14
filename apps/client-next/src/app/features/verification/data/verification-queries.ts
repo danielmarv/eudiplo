@@ -4,8 +4,6 @@ import {
   keyChainControllerGetAll,
   type KeyChainResponseDto,
   type OfferResponse,
-  type PresentationConfig,
-  presentationManagementControllerConfiguration,
   type PresentationRequest,
   verifierOfferControllerGetOffer,
 } from '@eudiplo/sdk-core';
@@ -18,16 +16,6 @@ import { mutationOptions, queryOptions } from '@tanstack/angular-query-experimen
 
 type Instance = string | undefined;
 type Tenant = string | null | undefined;
-
-/** The presentation configurations (`GET /api/verifier/config`). */
-export function presentationConfigsQuery(instance: Instance, tenant: Tenant) {
-  return queryOptions({
-    queryKey: ['presentation-configs', instance, tenant] as const,
-    queryFn: async (): Promise<PresentationConfig[]> =>
-      (await presentationManagementControllerConfiguration()).data ?? [],
-    enabled: !!instance,
-  });
-}
 
 /** The tenant's key chains (`GET /api/key-chain`); readable with a manage role. */
 export function keyChainsQuery(instance: Instance, tenant: Tenant, enabled = true) {

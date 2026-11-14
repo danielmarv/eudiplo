@@ -120,6 +120,11 @@ describe('Dashboard', () => {
     expect(page.textContent).toContain('Here is what happened on acme in the last 24 hours.');
     expect(page.querySelector('#sessions-heading')).not.toBeNull();
     expect(page.textContent).toContain('Enrolment 2026-0412');
+    const recentSessionLink = page.querySelector<HTMLAnchorElement>(
+      'a[href^="/session-management?"]'
+    );
+    expect(recentSessionLink).not.toBeNull();
+    expect(new URL(recentSessionLink!.href).searchParams.get('q')).toBe('7f3c2a10-aaaa');
     expect(page.textContent).toContain('3 completed');
     expect(page.textContent).toContain('1 failed');
     expect(page.textContent).toContain('Issue a credential');

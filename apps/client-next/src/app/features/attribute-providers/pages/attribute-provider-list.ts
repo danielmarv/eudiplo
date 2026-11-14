@@ -56,7 +56,8 @@ import {
   attributeProvidersQuery,
   credentialConfigsQuery,
 } from '../../issuance/data/issuance-queries';
-import { authLabel, hostOf, usersByProvider } from '../data/attribute-provider-display';
+import { authLabel, hostOf } from '../../../shared/api-key-endpoint/endpoint-display';
+import { usersByProvider } from '../data/attribute-provider-display';
 
 /** A provider with the IDs of the credential types that use it; unknown while they load. */
 interface Row {

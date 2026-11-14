@@ -1,0 +1,319 @@
+<app-page-header
+  heading="KMS providers"
+  description="The key-management providers available to this tenant, their capabilities and current health."
+>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    [attr.aria-disabled]="overview.isFetching() ? 'true' : null"
+    [hlmTooltip]="overview.isFetching() ? 'Refreshing KMS providers…' : 'Refresh providers'"
+    (click)="refresh()"
+  >
+    <ng-icon name="lucideRefreshCw" aria-hidden="true" />
+    Refresh
+  </button>
+</app-page-header>
+
+@if (canManageTenantConfig()) {
+<section
+  class="bg-card mb-6 grid gap-4 rounded-2xl p-4 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8 sm:p-5"
+  aria-labelledby="tenant-kms-heading"
+>
+  @if (owner(); as resource) {
+  <app-ownership-notice kind="KmsConfig" [resource]="resource" />
+  }
+  <div class="flex flex-wrap items-start justify-between gap-4">
+    <div class="min-w-0">
+      <h2 id="tenant-kms-heading" class="text-lg font-semibold">Tenant KMS configuration</h2>
+      <p class="text-muted-foreground mt-1 max-w-3xl text-sm">
+        Configure tenant-scoped providers. If no override is set, the global configuration applies.
+        Credentials are redacted; keep <code>&lt;redacted&gt;</code> unchanged to retain a stored
+        credential.
+      </p>
+      @if (tenantConfig.isSuccess()) {
+      <p class="mt-2 text-sm" role="status">
+        @if (hasTenantConfig()) { A tenant-specific configuration is active. } @else { Using the
+        global KMS configuration. }
+      </p>
+      }
+    </div>
+    @if (tenantConfig.isSuccess() && !editing()) {
+    <div class="flex flex-wrap gap-2">
+      <span [id]="'kms-config-action-reason'" class="sr-only">{{ configActionReason() }}</span>
+      <button
+        hlmBtn
+        variant="outline"
+        type="button"
+        [attr.aria-disabled]="configActionReason() ? 'true' : null"
+        [attr.aria-describedby]="configActionReason() ? 'kms-config-action-reason' : null"
+        [hlmTooltip]="configActionReason() || 'Edit tenant KMS configuration as JSON'"
+        (click)="beginEdit()"
+      >
+        <ng-icon name="lucidePencil" aria-hidden="true" />
+        Edit JSON
+      </button>
+      @if (hasTenantConfig()) {
+      <button
+        hlmBtn
+        variant="outline"
+        type="button"
+        [attr.aria-disabled]="configActionReason() ? 'true' : null"
+        [attr.aria-describedby]="configActionReason() ? 'kms-config-action-reason' : null"
+        [hlmTooltip]="configActionReason() || 'Reset to the global KMS configuration'"
+        (click)="askToReset()"
+      >
+        <ng-icon name="lucideRotateCcw" aria-hidden="true" />
+        Reset override
+      </button>
+      }
+    </div>
+    }
+  </div>
+
+  @if (ownership.isError()) {
+  <div
+    class="border-warning/30 bg-warning/8 text-warning-foreground rounded-xl border p-3 text-sm"
+    role="alert"
+  >
+    <p>
+      Configuration ownership could not be checked. Editing is unavailable until it can be verified.
+    </p>
+    <button hlmBtn variant="outline" type="button" class="mt-2" (click)="ownership.refetch()">
+      Retry ownership check
+    </button>
+  </div>
+  } @if (tenantConfig.isPending()) {
+  <div class="grid gap-3" role="status" aria-label="Loading tenant KMS configuration">
+    <hlm-skeleton class="h-5 w-48 rounded" />
+    <hlm-skeleton class="h-10 w-full rounded-xl" />
+  </div>
+  } @else if (tenantConfig.isError()) {
+  <div class="grid justify-items-start gap-2" role="alert">
+    <p class="font-medium">The tenant KMS configuration could not be loaded</p>
+    <p class="text-muted-foreground text-sm">{{ errorMessage(tenantConfig.error()) }}</p>
+    <button hlmBtn variant="outline" type="button" (click)="tenantConfig.refetch()">Retry</button>
+  </div>
+  } @else if (editing()) {
+  <form class="grid gap-3" (ngSubmit)="saveTenantConfig()">
+    <label for="tenant-kms-json" class="font-medium">Tenant KMS configuration JSON</label>
+    <textarea
+      id="tenant-kms-json"
+      hlmTextarea
+      rows="16"
+      spellcheck="false"
+      class="font-mono text-sm"
+      [formControl]="editorText"
+      aria-describedby="tenant-kms-json-help"
+    ></textarea>
+    <p id="tenant-kms-json-help" class="text-muted-foreground text-sm">
+      Only tenant providers are editable here. Global provider credentials are not copied into this
+      editor.
+    </p>
+    <div class="flex flex-wrap gap-2">
+      <button
+        hlmBtn
+        type="submit"
+        [attr.aria-disabled]="saving() || ownershipLock() ? 'true' : null"
+        [hlmTooltip]="ownershipLock() || (saving() ? 'Saving the tenant KMS configuration…' : 'Save tenant KMS configuration')"
+      >
+        <ng-icon name="lucideSave" aria-hidden="true" />
+        Save configuration
+      </button>
+      <button
+        hlmBtn
+        variant="ghost"
+        type="button"
+        [attr.aria-disabled]="saving() ? 'true' : null"
+        (click)="cancelEdit()"
+      >
+        <ng-icon name="lucideX" aria-hidden="true" />
+        Cancel
+      </button>
+    </div>
+  </form>
+  } @else if (confirmingReset()) {
+  <div class="border-destructive/25 bg-destructive/5 grid gap-3 rounded-xl border p-4" role="alert">
+    <p class="font-medium">Reset this tenant override?</p>
+    <p class="text-muted-foreground text-sm">
+      This removes the tenant-specific KMS configuration. The global configuration will apply
+      instead.
+    </p>
+    <div class="flex flex-wrap gap-2">
+      <button
+        hlmBtn
+        variant="destructive"
+        type="button"
+        [attr.aria-disabled]="configActionReason() ? 'true' : null"
+        (click)="resetTenantConfig()"
+      >
+        <ng-icon name="lucideRotateCcw" aria-hidden="true" />
+        Reset to global defaults
+      </button>
+      <button hlmBtn variant="ghost" type="button" (click)="confirmingReset.set(false)">
+        Cancel
+      </button>
+    </div>
+  </div>
+  }
+</section>
+}
+
+<section
+  class="bg-card overflow-hidden rounded-2xl shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+  aria-label="KMS providers"
+>
+  @if (overview.isPending()) {
+  <div class="grid gap-3 p-5" aria-label="Loading KMS providers" role="status">
+    @for (row of [1, 2, 3]; track row) {
+    <hlm-skeleton class="h-14 w-full rounded-xl" />
+    }
+  </div>
+  } @else if (overview.isError()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center" role="alert">
+    <span
+      class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideTriangleAlert" class="text-xl" />
+    </span>
+    <p class="font-semibold">KMS providers could not be loaded</p>
+    <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(overview.error()) }}</p>
+    <button hlmBtn variant="outline" type="button" (click)="overview.refetch()">Retry</button>
+  </div>
+  } @else if (!rows().length) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <span
+      class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideFileKey2" class="text-xl" />
+    </span>
+    <p class="font-semibold">No KMS providers are configured</p>
+    <p class="text-muted-foreground max-w-md text-sm">
+      Configure a provider in the instance settings, or add a tenant-scoped provider above.
+    </p>
+  </div>
+  } @else {
+  <div class="overflow-x-auto">
+    <table class="w-full min-w-[54rem] text-left text-sm">
+      <thead class="bg-muted/40 text-muted-foreground">
+        <tr>
+          <th scope="col" class="px-4 py-3 font-medium sm:px-5">Provider</th>
+          <th scope="col" class="px-4 py-3 font-medium">Type</th>
+          <th scope="col" class="px-4 py-3 font-medium">Capabilities</th>
+          <th scope="col" class="px-4 py-3 font-medium">Algorithms</th>
+          <th scope="col" class="px-4 py-3 font-medium">Health</th>
+          <th scope="col" class="px-4 py-3 font-medium">Use</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of rows(); track row.provider.name) {
+        <tr class="border-t align-top">
+          <th scope="row" class="px-4 py-4 font-medium sm:px-5">
+            <span class="flex flex-wrap items-center gap-2">
+              <span>{{ row.provider.name }}</span>
+              @if (row.isDefault) {
+              <span class="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-xs"
+                >Default</span
+              >
+              }
+            </span>
+            @if (row.provider.description) {
+            <p class="text-muted-foreground mt-1 max-w-sm font-normal">
+              {{ row.provider.description }}
+            </p>
+            }
+          </th>
+          <td class="px-4 py-4">
+            <span class="bg-muted rounded-md px-2 py-1 text-xs">{{ row.provider.type }}</span>
+          </td>
+          <td class="px-4 py-4">
+            <ul class="flex flex-wrap gap-1.5">
+              <li
+                class="rounded-md px-2 py-1 text-xs"
+                [class.bg-success/10]="row.provider.capabilities.canCreate"
+                [class.text-success]="row.provider.capabilities.canCreate"
+                [class.bg-muted]="!row.provider.capabilities.canCreate"
+                [class.text-muted-foreground]="!row.provider.capabilities.canCreate"
+              >
+                Create
+              </li>
+              <li
+                class="rounded-md px-2 py-1 text-xs"
+                [class.bg-success/10]="row.provider.capabilities.canImport"
+                [class.text-success]="row.provider.capabilities.canImport"
+                [class.bg-muted]="!row.provider.capabilities.canImport"
+                [class.text-muted-foreground]="!row.provider.capabilities.canImport"
+              >
+                Import
+              </li>
+              <li
+                class="rounded-md px-2 py-1 text-xs"
+                [class.bg-success/10]="row.provider.capabilities.canDelete"
+                [class.text-success]="row.provider.capabilities.canDelete"
+                [class.bg-muted]="!row.provider.capabilities.canDelete"
+                [class.text-muted-foreground]="!row.provider.capabilities.canDelete"
+              >
+                Delete
+              </li>
+            </ul>
+          </td>
+          <td class="px-4 py-4">
+            <div class="flex flex-wrap gap-1">
+              @for (algorithm of row.provider.capabilities.supportedAlgs; track algorithm) {
+              <span class="bg-muted rounded-md px-2 py-1 text-xs">
+                {{ algorithm }}{{ algorithm === row.provider.capabilities.defaultAlg ? ' (default)'
+                : '' }}
+              </span>
+              }
+            </div>
+          </td>
+          <td class="px-4 py-4">
+            @if (row.health?.ok === true) {
+            <span class="text-success inline-flex items-center gap-1.5">
+              <ng-icon name="lucideCheckCircle2" aria-hidden="true" />
+              OK@if (row.health.latencyMs !== undefined) { ({{ row.health.latencyMs }} ms) }
+            </span>
+            } @else if (row.health?.ok === false) {
+            <span
+              class="text-destructive inline-flex items-center gap-1.5"
+              [hlmTooltip]="row.health.error || 'Provider health check failed'"
+            >
+              <ng-icon name="lucideTriangleAlert" aria-hidden="true" />
+              Unavailable
+            </span>
+            } @else {
+            <span class="text-muted-foreground inline-flex items-center gap-1.5">
+              <ng-icon name="lucideCircleHelp" aria-hidden="true" />
+              Unknown
+            </span>
+            }
+          </td>
+          <td class="px-4 py-4">
+            @if (row.provider.capabilities.canCreate) {
+            <a
+              hlmBtn
+              variant="outline"
+              size="sm"
+              [routerLink]="['/keys/create']"
+              [queryParams]="{ kmsProvider: row.provider.name }"
+              [attr.aria-label]="'Create key with provider ' + row.provider.name"
+            >
+              <ng-icon name="lucideKeyRound" aria-hidden="true" />
+              Create key
+            </a>
+            } @else {
+            <span class="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+              <ng-icon name="lucideLockKeyhole" aria-hidden="true" />
+              Key creation unavailable
+            </span>
+            }
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  }
+</section>

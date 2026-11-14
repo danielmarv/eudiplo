@@ -59,7 +59,7 @@ let nextId = 0;
           [value]="'' + pageSize()"
           (valueChange)="setPageSize($event)"
         >
-          @for (size of sizes; track size) {
+          @for (size of sizes(); track size) {
             <option [value]="size">{{ size }}</option>
           }
         </hlm-native-select>
@@ -128,8 +128,11 @@ export class TablePagination {
   /** What a row is, as in "1–10 of 23 tenants". */
   readonly singular = input.required<string>();
   readonly plural = input.required<string>();
+  /** Total rows when the table holds only the current server page. */
+  readonly totalRecords = input<number>();
+  /** Page sizes offered by this list; defaults to the sizes used by local lists. */
+  readonly sizes = input<readonly number[]>(PAGE_SIZES);
 
-  protected readonly sizes = PAGE_SIZES;
   protected readonly selectId = `table-page-size-${nextId++}`;
 
   private readonly pagination = computed(() => this.table().atoms.pagination.get());
@@ -137,7 +140,9 @@ export class TablePagination {
   protected readonly pageSize = computed(() => this.pagination().pageSize);
   /** At least one page, so an empty result reads "Page 1 of 1". */
   protected readonly pageCount = computed(() => Math.max(1, this.table().getPageCount()));
-  protected readonly total = computed(() => this.table().getPrePaginatedRowModel().rows.length);
+  protected readonly total = computed(
+    () => this.totalRecords() ?? this.table().getPrePaginatedRowModel().rows.length
+  );
   protected readonly first = computed(() =>
     this.total() ? this.pageIndex() * this.pageSize() + 1 : 0
   );
@@ -147,6 +152,6 @@ export class TablePagination {
 
   protected setPageSize(value: string | null | undefined): void {
     const size = Number(value);
-    if (PAGE_SIZES.includes(size as (typeof PAGE_SIZES)[number])) this.table().setPageSize(size);
+    if (this.sizes().includes(size)) this.table().setPageSize(size);
   }
 }

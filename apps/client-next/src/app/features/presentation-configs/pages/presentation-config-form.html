@@ -1,0 +1,727 @@
+@if (editing()) {
+<app-ownership-notice
+  class="mb-6 block empty:hidden"
+  kind="PresentationConfig"
+  [resource]="owner()"
+/>
+}
+
+<app-page-header
+  [heading]="title()"
+  description="Choose what a wallet is asked to present, then set how the request is verified and integrated."
+>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    [attr.aria-disabled]="(id() && !config.isSuccess()) || null"
+    (click)="!(id() && !config.isSuccess()) && openJson()"
+  >
+    <ng-icon name="lucideCode" aria-hidden="true" />
+    Edit as JSON
+  </button>
+  <button hlmBtn variant="outline" type="button" (click)="toggleGuided()">
+    <ng-icon name="lucideBraces" aria-hidden="true" />
+    {{ guided() ? 'Switch to editor' : 'Use guided setup' }}
+  </button>
+  <a
+    hlmBtn
+    variant="ghost"
+    href="https://docs.eudiplo.dev/presentation/configure-verification"
+    target="_blank"
+    rel="noopener"
+  >
+    <ng-icon name="lucideExternalLink" aria-hidden="true" />
+    Documentation
+  </a>
+</app-page-header>
+
+@if (sourceRequired() && config.isPending()) {
+<div class="grid max-w-4xl gap-4" role="status" aria-label="Loading presentation configuration">
+  <hlm-skeleton class="h-28 w-full rounded-2xl" />
+  <hlm-skeleton class="h-80 w-full rounded-2xl" />
+</div>
+} @else if (sourceRequired() && config.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl">
+    <ng-icon name="lucideTriangleAlert" class="text-xl" aria-hidden="true" />
+  </span>
+  @if (notFound(config.error())) {
+  <p class="font-semibold">There is no presentation configuration {{ id() }}</p>
+  } @else {
+  <p class="font-semibold">The presentation configuration could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ configError() }}</p>
+  <p class="text-muted-foreground text-sm">It can only be changed after it has loaded.</p>
+  }
+  <div class="flex flex-wrap justify-center gap-2">
+    @if (!notFound(config.error())) {
+    <button hlmBtn variant="outline" type="button" (click)="config.refetch()">Retry</button>
+    }
+    <a hlmBtn variant="ghost" routerLink="/presentation-config">
+      <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+      All presentation configurations
+    </a>
+  </div>
+</section>
+} @else {
+<form #formElement class="grid max-w-5xl gap-6" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+  @if (guided()) {
+  <nav
+    class="bg-muted/50 grid grid-cols-2 gap-1 rounded-xl p-1 sm:grid-cols-4"
+    aria-label="Configuration steps"
+  >
+    @for (step of stepDescriptions; track $index; let index = $index) {
+    <button
+      type="button"
+      class="aria-current:bg-card aria-current:text-foreground text-muted-foreground rounded-lg px-2 py-2 text-left text-xs transition-colors aria-current:shadow-sm sm:text-sm"
+      [attr.aria-current]="activeStep() === index ? 'step' : null"
+      [attr.aria-disabled]="index > furthestStep() ? 'true' : null"
+      (click)="index <= furthestStep() && activeStep.set(index)"
+    >
+      <span class="font-mono">{{ index + 1 }}</span>
+      <span class="ml-1.5 hidden sm:inline">{{ step }}</span>
+    </button>
+    }
+  </nav>
+  <p class="text-muted-foreground text-sm" aria-live="polite">
+    Step {{ activeStep() + 1 }} of 4 · {{ stepDescriptions[activeStep()] }}
+  </p>
+  } @if (!guided() || activeStep() === 0) {
+  <section class="bg-card grid gap-5 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div>
+      <h2 class="font-heading text-xl font-semibold">Name this presentation</h2>
+      <p class="text-muted-foreground mt-1 text-sm">
+        Give this reusable request an ID so it can be selected when creating a verification session.
+      </p>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="grid gap-1.5">
+        <span class="text-sm font-medium">Configuration ID</span>
+        <input
+          hlmInput
+          formControlName="id"
+          autocomplete="off"
+          [readonly]="editing()"
+          placeholder="e.g. age-verification"
+          [attr.aria-invalid]="form.controls.id.touched && form.controls.id.invalid"
+          aria-describedby="presentation-id-help"
+        />
+        <span id="presentation-id-help" class="text-muted-foreground text-xs">
+          Letters, numbers, underscores and hyphens.
+        </span>
+        @if (form.controls.id.touched && form.controls.id.invalid) {
+        <span class="text-destructive text-sm" role="alert">Enter a configuration ID.</span>
+        }
+      </label>
+      <label class="grid gap-1.5">
+        <span class="text-sm font-medium">Description</span>
+        <input
+          hlmInput
+          formControlName="description"
+          placeholder="What this request verifies"
+          [attr.aria-invalid]="form.controls.description.touched && form.controls.description.invalid"
+        />
+        @if (form.controls.description.touched && form.controls.description.invalid) {
+        <span class="text-destructive text-sm" role="alert">Enter a description.</span>
+        }
+      </label>
+    </div>
+  </section>
+  } @if (!guided() || activeStep() === 1) {
+  <section class="bg-card grid gap-5 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 class="font-heading text-xl font-semibold">Credentials and claims</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          Define a DCQL query visually or keep advanced query rules in JSON.
+        </p>
+      </div>
+      @if (!editing() || copy()) {
+      <div class="grid min-w-56 gap-1 text-sm">
+        <label class="grid gap-1">
+          <span class="font-medium">Start from a template</span>
+          <select hlmNativeSelect (change)="selectedTemplate($any($event.target).value)">
+            <option value="">Choose a template</option>
+            @for (template of templates; track template.name) {
+            <option [value]="template.name">{{ template.name }}</option>
+            }
+          </select>
+        </label>
+        @for (template of templates; track template.name) {
+        <button
+          type="button"
+          class="text-primary justify-self-start text-xs hover:underline"
+          (click)="previewTemplate(template)"
+        >
+          Preview {{ template.name }}
+        </button>
+        }
+      </div>
+      }
+    </div>
+
+    <div class="grid gap-4 rounded-xl border p-4">
+      <h3 class="font-medium">Import a credential query</h3>
+      <div class="flex flex-wrap gap-2" role="group" aria-label="Import source">
+        <button
+          hlmBtn
+          type="button"
+          [variant]="importKind() === 'issuer' ? 'default' : 'outline'"
+          (click)="chooseImport('issuer')"
+        >
+          Issuer metadata
+        </button>
+        <button
+          hlmBtn
+          type="button"
+          [variant]="importKind() === 'schema' ? 'default' : 'outline'"
+          (click)="chooseImport('schema')"
+        >
+          Schema metadata
+        </button>
+      </div>
+      @if (importKind() === 'issuer') {
+      <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
+        <label class="grid gap-1.5">
+          <span class="text-sm font-medium">Credential issuer URL</span>
+          <input
+            hlmInput
+            type="url"
+            [value]="issuerUrl()"
+            placeholder="https://issuer.example"
+            (input)="issuerUrl.set($any($event.target).value)"
+          />
+        </label>
+        <button
+          hlmBtn
+          type="button"
+          class="self-end"
+          [attr.aria-disabled]="importBusy() || null"
+          (click)="!importBusy() && importIssuer()"
+        >
+          @if (importBusy()) { <hlm-spinner class="size-4" aria-hidden="true" /> } @else {
+          <ng-icon name="lucideUpload" aria-hidden="true" />
+          } Import from issuer
+        </button>
+      </div>
+      } @else {
+      <div class="grid gap-3">
+        <div class="grid gap-2 sm:grid-cols-[1fr_auto]">
+          <label class="grid gap-1.5">
+            <span class="text-sm font-medium">Schema metadata URL</span>
+            <input
+              hlmInput
+              type="url"
+              [value]="schemaUrl()"
+              placeholder="https://issuer.example/.well-known/schema-metadata"
+              (input)="schemaUrl.set($any($event.target).value)"
+            />
+          </label>
+          <button
+            hlmBtn
+            type="button"
+            class="self-end"
+            [attr.aria-disabled]="importBusy() || null"
+            (click)="!importBusy() && importSchemaUrl()"
+          >
+            <ng-icon name="lucideUpload" aria-hidden="true" />
+            Import URL
+          </button>
+        </div>
+        <div>
+          <h4 class="text-sm font-medium">Published schema catalog</h4>
+          @if (catalog.isPending()) {
+          <p class="text-muted-foreground mt-2 text-sm" role="status">
+            Loading the schema catalog…
+          </p>
+          } @else if (catalog.isError()) {
+          <p class="text-destructive mt-2 text-sm" role="alert">
+            {{ errorMessage(catalog.error()) }}
+          </p>
+          <button hlmBtn variant="outline" size="sm" type="button" (click)="catalog.refetch()">
+            Retry
+          </button>
+          } @else if (!catalog.data()?.length) {
+          <p class="text-muted-foreground mt-2 text-sm">No published schemas are available.</p>
+          } @else {
+          <ul class="mt-2 grid max-h-56 gap-2 overflow-auto">
+            @for (entry of catalog.data(); track entry.id + entry.version) {
+            <li class="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+              <span class="min-w-0">
+                <span class="block truncate text-sm font-medium"
+                  >{{ entry.displayName || entry.id }}</span
+                >
+                <span class="text-muted-foreground text-xs">
+                  {{ entry.version }} · {{ entry.supportedFormats.join(', ') }} · {{ entry.issuer }}
+                </span>
+              </span>
+              <button
+                hlmBtn
+                size="sm"
+                variant="outline"
+                type="button"
+                [attr.aria-disabled]="importBusy() || null"
+                (click)="!importBusy() && importCatalogEntry(entry)"
+              >
+                Import
+              </button>
+            </li>
+            }
+          </ul>
+          }
+        </div>
+      </div>
+      } @if (importError()) {
+      <p class="text-destructive text-sm" role="alert">{{ importError() }}</p>
+      }
+    </div>
+
+    <app-dcql-editor [(draft)]="draft" [(showErrors)]="showQueryErrors" />
+  </section>
+  } @if (!guided() || activeStep() === 2) {
+  <section class="bg-card grid gap-5 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div>
+      <h2 class="font-heading text-xl font-semibold">Request and verification settings</h2>
+      <p class="text-muted-foreground mt-1 text-sm">Defaults work for most integrations.</p>
+    </div>
+
+    <section class="grid gap-4 rounded-xl border p-4">
+      <h3 class="font-medium">Request behavior</h3>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <label class="grid gap-1.5">
+          <span class="text-sm font-medium">Request lifetime (seconds)</span>
+          <input
+            hlmInput
+            type="number"
+            min="1"
+            step="1"
+            formControlName="lifeTime"
+            [attr.aria-invalid]="form.controls.lifeTime.touched && form.controls.lifeTime.invalid"
+          />
+          @if (form.controls.lifeTime.touched && form.controls.lifeTime.invalid) {
+          <span class="text-destructive text-sm" role="alert">
+            Enter a whole number of seconds greater than zero.
+          </span>
+          }
+        </label>
+        <label class="grid gap-1.5">
+          <span class="text-sm font-medium">Credential status checks</span>
+          <select hlmNativeSelect formControlName="statusCheckMode">
+            @for (mode of modes; track mode.value) {
+            <option [value]="mode.value">{{ mode.label }}</option>
+            }
+          </select>
+          <span class="text-muted-foreground text-xs">
+            {{ modeHint(form.controls.statusCheckMode.value) }}
+          </span>
+        </label>
+        <label class="grid gap-1.5 sm:col-span-2">
+          <span class="text-sm font-medium">Redirect URI (optional)</span>
+          <input
+            hlmInput
+            type="url"
+            formControlName="redirectUri"
+            placeholder="https://shop.example/complete?session={sessionId}"
+            [attr.aria-invalid]="form.controls.redirectUri.touched && form.controls.redirectUri.invalid"
+          />
+          <span class="text-muted-foreground text-xs">
+            The user is redirected after the presentation. Use
+            <code>{{ '{' }}sessionId{{ '}' }}</code> for the session ID.
+          </span>
+        </label>
+        <label class="grid gap-1.5 sm:col-span-2">
+          <span class="text-sm font-medium"
+            >Allowed origins for Digital Credentials API (optional)</span
+          >
+          <textarea
+            hlmTextarea
+            rows="3"
+            formControlName="allowedOrigins"
+            placeholder="https://shop.example"
+            [attr.aria-invalid]="form.controls.allowedOrigins.touched && form.controls.allowedOrigins.invalid"
+          ></textarea>
+          <span class="text-muted-foreground text-xs">
+            One origin per line. Empty means unrestricted. Include this console origin to launch
+            requests here: <code>{{ pageOrigin }}</code>
+          </span>
+          @if (form.controls.allowedOrigins.touched && form.controls.allowedOrigins.errors; as
+          errors) {
+          <span class="text-destructive text-sm" role="alert">
+            @if (errors['tooMany']) { List at most 100 origins. } @else { Use lower-case http(s)
+            origins without a path, trailing slash or default port. }
+          </span>
+          }
+        </label>
+      </div>
+      <label class="grid gap-1.5">
+        <span class="text-sm font-medium">Access key chain</span>
+        <select hlmNativeSelect formControlName="accessKeyChainId">
+          <option value="">Use the tenant default access key chain</option>
+          @for (chain of keyChains.data() ?? []; track chain.id) {
+          <option [value]="chain.id">
+            {{ chain.id }}{{ chain.description ? ' · ' + chain.description : '' }}
+          </option>
+          }
+        </select>
+        @if (keyChains.isError()) {
+        <span class="text-destructive text-sm" role="alert">
+          {{ errorMessage(keyChains.error()) }}
+        </span>
+        } @if (accessSetupMessage()) {
+        <span class="text-warning text-sm" role="status">{{ accessSetupMessage() }}</span>
+        }
+      </label>
+    </section>
+
+    <section class="grid gap-4 rounded-xl border p-4">
+      <div>
+        <h3 class="font-medium">Registration certificate</h3>
+        <p class="text-muted-foreground mt-1 text-sm">
+          Optional registrar certificate. Import a JWT or existing ID, or request a new certificate
+          from its details.
+        </p>
+      </div>
+      @if (editing()) {
+      <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/50 p-3">
+        <span class="inline-flex items-center gap-2 text-sm">
+          <ng-icon name="lucideShieldCheck" aria-hidden="true" />
+          <span class="capitalize">{{ registrationStatusLabel() }}</span>
+          <span class="text-muted-foreground">· {{ registrationSource() }}</span>
+        </span>
+        @if (registrationStatus() !== 'none') {
+        <button
+          hlmBtn
+          variant="outline"
+          type="button"
+          [attr.aria-disabled]="reissuing() || null"
+          (click)="!reissuing() && reissueRegistrationCertificate()"
+        >
+          @if (reissuing()) { <hlm-spinner class="size-4" aria-hidden="true" /> } @else {
+          <ng-icon name="lucideRefreshCw" aria-hidden="true" />
+          } {{ reissuing() ? 'Reissuing…' : 'Reissue now' }}
+        </button>
+        }
+      </div>
+      }
+      <label class="grid max-w-md gap-1.5">
+        <span class="text-sm font-medium">Certificate source</span>
+        <select hlmNativeSelect formControlName="registrationMode">
+          <option value="none">None</option>
+          <option value="jwt">Imported JWT</option>
+          <option value="id">Existing registrar certificate ID</option>
+          <option value="body">Request a new certificate</option>
+        </select>
+      </label>
+      @if (form.controls.registrationMode.value === 'jwt') {
+      <label class="grid gap-1.5">
+        <span class="text-sm font-medium">Registration certificate JWT</span>
+        <textarea
+          hlmTextarea
+          rows="4"
+          formControlName="registrationJwt"
+          placeholder="Paste an existing registration certificate JWT"
+        ></textarea>
+        <span class="text-muted-foreground text-xs"
+          >The JWT is forwarded as-is; EUDIPLO does not contact the registrar.</span
+        >
+        @if (form.controls.registrationJwt.touched && form.controls.registrationJwt.invalid) {
+        <span class="text-destructive text-sm" role="alert"
+          >A JWT is required for this source.</span
+        >
+        }
+      </label>
+      } @if (form.controls.registrationMode.value === 'id') {
+      <label class="grid max-w-md gap-1.5">
+        <span class="text-sm font-medium">Existing certificate ID</span>
+        <input hlmInput formControlName="registrationId" placeholder="registrar-certificate-id" />
+        @if (form.controls.registrationId.touched && form.controls.registrationId.invalid) {
+        <span class="text-destructive text-sm" role="alert">A certificate ID is required.</span>
+        }
+      </label>
+      } @if (form.controls.registrationMode.value === 'body') {
+      <div class="grid gap-4">
+        @if (registrar.isError()) {
+        <p class="text-destructive text-sm" role="alert">
+          Registrar defaults could not be loaded: {{ errorMessage(registrar.error()) }}
+        </p>
+        }
+        <div class="grid gap-4 sm:grid-cols-2">
+          <label class="grid gap-1.5">
+            <span class="text-sm font-medium">Privacy policy URL</span>
+            <input
+              hlmInput
+              type="url"
+              formControlName="privacyPolicy"
+              placeholder="https://shop.example/privacy"
+            />
+          </label>
+          <label class="grid gap-1.5">
+            <span class="text-sm font-medium">Support URI</span>
+            <input
+              hlmInput
+              formControlName="supportUri"
+              placeholder="mailto:support@shop.example"
+            />
+          </label>
+          <label class="grid gap-1.5 sm:col-span-2">
+            <span class="text-sm font-medium">Intermediary RP ID (optional)</span>
+            <input hlmInput formControlName="intermediary" />
+          </label>
+        </div>
+        <div class="grid gap-3">
+          <div class="flex items-center justify-between gap-2">
+            <h4 class="text-sm font-medium">Purpose statements</h4>
+            <button hlmBtn type="button" variant="outline" size="sm" (click)="addPurpose()">
+              <ng-icon name="lucidePlus" aria-hidden="true" />
+              Add purpose
+            </button>
+          </div>
+          <div formArrayName="purposes" class="grid gap-3">
+            @for (purpose of form.controls.purposes.controls; track $index; let index = $index) {
+            <div [formGroupName]="index" class="grid items-end gap-3 sm:grid-cols-[12rem_1fr_auto]">
+              <label class="grid gap-1.5">
+                <span class="text-xs font-medium">Language</span>
+                <select hlmNativeSelect formControlName="lang">
+                  @for (language of languages; track language.value) {
+                  <option [value]="language.value">
+                    {{ language.label }} ({{ language.value }})
+                  </option>
+                  }
+                </select>
+              </label>
+              <label class="grid gap-1.5">
+                <span class="text-xs font-medium">Purpose</span>
+                <input hlmInput formControlName="content" placeholder="To verify the user's age" />
+              </label>
+              <button
+                hlmBtn
+                type="button"
+                variant="ghost"
+                size="icon"
+                [attr.aria-label]="'Remove purpose ' + (index + 1)"
+                (click)="removePurpose(index)"
+              >
+                <ng-icon name="lucideTriangleAlert" aria-hidden="true" />
+              </button>
+            </div>
+            }
+          </div>
+          <p class="text-muted-foreground text-xs">
+            Add at least one purpose statement in the language wallets should display.
+          </p>
+          @if (form.controls.purposes.touched && form.controls.purposes.invalid) {
+          <p class="text-destructive text-sm" role="alert">Add a purpose statement.</p>
+          }
+        </div>
+      </div>
+      }
+    </section>
+
+    <section class="grid gap-4 rounded-xl border p-4">
+      <div>
+        <h3 class="font-medium">Application integrations</h3>
+        <p class="text-muted-foreground mt-1 text-sm">
+          Webhook notifications and extra request data.
+        </p>
+      </div>
+      <label class="grid gap-1.5">
+        <span class="text-sm font-medium">Webhook endpoint</span>
+        <select hlmNativeSelect formControlName="webhookEndpointId">
+          <option value="">None</option>
+          @for (webhook of webhooks.data() ?? []; track webhook.id) {
+          <option [value]="webhook.id">{{ webhook.name }} ({{ webhook.id }})</option>
+          }
+        </select>
+        @if (webhooks.isError()) {
+        <span class="text-destructive text-sm" role="alert"
+          >{{ errorMessage(webhooks.error()) }}</span
+        >
+        }
+      </label>
+      <label class="grid gap-1.5">
+        <span class="text-sm font-medium">Attached data (JSON array, optional)</span>
+        <textarea
+          hlmTextarea
+          class="min-h-28 font-mono text-sm"
+          spellcheck="false"
+          formControlName="attached"
+          placeholder='[{"format":"dc+sd-jwt","data":{"...":"..."},"credential_ids":["pid"]}]'
+          [attr.aria-invalid]="form.controls.attached.touched && form.controls.attached.invalid"
+        ></textarea>
+        <span class="text-muted-foreground text-xs"
+          >Each entry needs a format and a data object. Credential IDs must exist in the DCQL
+          query.</span
+        >
+        @if (form.controls.attached.touched && form.controls.attached.invalid) {
+        <span class="text-destructive text-sm" role="alert"
+          >{{ form.controls.attached.getError('json') }}</span
+        >
+        }
+      </label>
+      <label class="grid gap-1.5">
+        <span class="text-sm font-medium">Transaction data (JSON array, optional)</span>
+        <textarea
+          hlmTextarea
+          class="min-h-28 font-mono text-sm"
+          spellcheck="false"
+          formControlName="transactionData"
+          placeholder='[{"type":"payment","credential_ids":["pid"]}]'
+          [attr.aria-invalid]="form.controls.transactionData.touched && form.controls.transactionData.invalid"
+        ></textarea>
+        <span class="text-muted-foreground text-xs"
+          >Each entry needs a type and at least one credential query ID.</span
+        >
+        @if (form.controls.transactionData.touched && form.controls.transactionData.invalid) {
+        <span class="text-destructive text-sm" role="alert"
+          >{{ form.controls.transactionData.getError('json') }}</span
+        >
+        }
+      </label>
+    </section>
+  </section>
+  } @if (!guided() || activeStep() === 3) {
+  <section class="bg-card grid gap-5 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8 sm:p-6">
+    <div>
+      <h2 class="font-heading text-xl font-semibold">Review configuration</h2>
+      <p class="text-muted-foreground mt-1 text-sm">Check the request that will be saved.</p>
+    </div>
+    <dl class="grid gap-3 sm:grid-cols-2">
+      <div>
+        <dt class="text-muted-foreground text-xs">ID</dt>
+        <dd class="font-mono">{{ form.controls.id.value || 'Not set' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Description</dt>
+        <dd>{{ form.controls.description.value || 'None' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Request lifetime</dt>
+        <dd>{{ form.controls.lifeTime.value }} seconds</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Status checks</dt>
+        <dd>{{ statusModeValue() }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Signing key chain</dt>
+        <dd>{{ form.controls.accessKeyChainId.value || 'Tenant default' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Registration certificate</dt>
+        <dd>{{ registrationSource() }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Webhook</dt>
+        <dd>{{ form.controls.webhookEndpointId.value || 'None' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Redirect URI</dt>
+        <dd class="break-all">{{ form.controls.redirectUri.value || 'None' }}</dd>
+      </div>
+      <div class="sm:col-span-2">
+        <dt class="text-muted-foreground text-xs">Allowed origins</dt>
+        <dd class="break-all">{{ form.controls.allowedOrigins.value || 'Not restricted' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Attached data</dt>
+        <dd>{{ form.controls.attached.value ? 'Configured' : 'None' }}</dd>
+      </div>
+      <div>
+        <dt class="text-muted-foreground text-xs">Transaction data</dt>
+        <dd>{{ form.controls.transactionData.value ? 'Configured' : 'None' }}</dd>
+      </div>
+    </dl>
+    @if (accessSetupMessage()) {
+    <p class="rounded-xl bg-warning/10 p-3 text-sm" role="status">{{ accessSetupMessage() }}</p>
+    }
+    <details>
+      <summary class="cursor-pointer font-medium">DCQL query JSON</summary>
+      <pre class="bg-muted mt-3 overflow-auto rounded-xl p-4 font-mono text-xs">
+{{ queryPreview() | json }}</pre>
+    </details>
+  </section>
+  } @if (formError()) {
+  <p class="text-destructive text-sm" role="alert">{{ formError() }}</p>
+  } @if (locked()) {
+  <p class="text-muted-foreground text-sm" role="status">
+    {{ locked() }} This configuration cannot be edited here.
+  </p>
+  }
+
+  <footer class="flex flex-wrap items-center gap-2">
+    <a
+      hlmBtn
+      variant="ghost"
+      [routerLink]="copy() ? ['/presentation-config', id()] : '/presentation-config'"
+    >
+      Cancel
+    </a>
+    <span class="flex-1"></span>
+    @if (guided() && activeStep() > 0) {
+    <button
+      hlmBtn
+      variant="outline"
+      type="button"
+      [attr.aria-disabled]="saving() || null"
+      (click)="!saving() && previousStep()"
+    >
+      Back
+    </button>
+    } @if (guided() && activeStep() < 3) {
+    <button hlmBtn type="submit">
+      Continue
+      <ng-icon name="lucideArrowLeft" class="rotate-180" aria-hidden="true" />
+    </button>
+    } @else {
+    <button
+      hlmBtn
+      type="submit"
+      [attr.aria-disabled]="saving() || !!locked() || null"
+      [hlmTooltip]="saving() ? 'Saving the presentation configuration…' : locked()"
+    >
+      @if (saving()) { <hlm-spinner class="size-4" aria-hidden="true" /> } @else {
+      <ng-icon name="lucideCheck" aria-hidden="true" /> } {{ saving() ? 'Saving…' : editing() ?
+      'Save changes' : 'Create configuration' }}
+    </button>
+    }
+  </footer>
+</form>
+}
+
+<hlm-dialog [state]="jsonOpen() ? 'open' : 'closed'" (stateChanged)="onJsonState($event)">
+  <hlm-dialog-content *hlmDialogPortal="let ctx" class="sm:max-w-3xl">
+    <hlm-dialog-header>
+      <h2 hlmDialogTitle>Presentation configuration as JSON</h2>
+      <p hlmDialogDescription>
+        Edit the full API configuration. The DCQL query remains editable in its visual builder after
+        applying.
+      </p>
+    </hlm-dialog-header>
+    <label class="sr-only" for="presentation-config-json">Presentation configuration JSON</label>
+    <textarea
+      hlmTextarea
+      id="presentation-config-json"
+      class="min-h-96 font-mono text-sm"
+      spellcheck="false"
+      [value]="json()"
+      [readonly]="jsonReadonly()"
+      [attr.aria-invalid]="!!jsonError() || null"
+      [attr.aria-describedby]="jsonError() ? 'presentation-config-json-error' : null"
+      (input)="json.set($any($event.target).value); jsonError.set('')"
+    ></textarea>
+    @if (jsonError()) {
+    <p id="presentation-config-json-error" class="text-destructive text-sm" role="alert">
+      {{ jsonError() }}
+    </p>
+    }
+    <hlm-dialog-footer>
+      <button hlmBtn variant="ghost" type="button" (click)="jsonOpen.set(false)">Cancel</button>
+      @if (!jsonReadonly()) {
+      <button hlmBtn type="button" (click)="applyJson()">Use this JSON</button>
+      }
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>

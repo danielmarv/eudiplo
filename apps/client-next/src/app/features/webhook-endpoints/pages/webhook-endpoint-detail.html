@@ -1,0 +1,244 @@
+<app-ownership-notice class="mb-6 block empty:hidden" kind="WebhookEndpoint" [resource]="owner()" />
+
+@if (endpoint.isPending()) {
+<div role="status" aria-label="Loading the webhook endpoint" class="grid gap-6">
+  <hlm-skeleton class="h-10 w-72 rounded-lg" />
+  <div class="grid gap-6 lg:grid-cols-2">
+    <hlm-skeleton class="h-48 rounded-2xl" />
+    <hlm-skeleton class="h-48 rounded-2xl" />
+  </div>
+</div>
+} @else if (endpoint.isError()) {
+<section
+  class="bg-card grid justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  @if (notFound(endpoint.error())) {
+  <h1 class="text-lg font-semibold">There is no webhook endpoint {{ id() }}</h1>
+  <p class="text-muted-foreground max-w-md text-sm">
+    It may have been deleted, or the address has a typo.
+  </p>
+  <a hlmBtn variant="outline" routerLink="/webhook-endpoints">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    All webhook endpoints
+  </a>
+  } @else {
+  <h1 class="text-lg font-semibold">The webhook endpoint could not be loaded</h1>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(endpoint.error()) }}</p>
+  <div class="flex flex-wrap justify-center gap-2">
+    <button hlmBtn variant="outline" type="button" (click)="endpoint.refetch()">Retry</button>
+    <a hlmBtn variant="ghost" routerLink="/webhook-endpoints">All webhook endpoints</a>
+  </div>
+  }
+</section>
+} @else if (endpoint.data(); as current) {
+<app-page-header [heading]="current.name || current.id" [description]="current.description || ''">
+  @if (documents.canDownload('WebhookEndpoint')) {
+  <button
+    hlmBtn
+    variant="outline"
+    size="icon"
+    type="button"
+    aria-label="Download configuration"
+    hlmTooltip="Download configuration"
+    [attr.aria-disabled]="downloading() || null"
+    [attr.aria-busy]="downloading() || null"
+    (click)="download()"
+  >
+    @if (downloading()) {
+    <hlm-spinner class="size-4" />
+    } @else {
+    <ng-icon name="lucideDownload" />
+    }
+  </button>
+  } @if (locked()) {
+  <span id="endpoint-locked" class="sr-only">{{ locked() }}</span>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    class="cursor-not-allowed opacity-50"
+    aria-disabled="true"
+    aria-describedby="endpoint-locked"
+    [hlmTooltip]="locked()"
+  >
+    <ng-icon name="lucideTrash2" aria-hidden="true" />
+    Delete
+  </button>
+  <button
+    hlmBtn
+    type="button"
+    class="cursor-not-allowed opacity-50"
+    aria-disabled="true"
+    aria-describedby="endpoint-locked"
+    [hlmTooltip]="locked()"
+  >
+    <ng-icon name="lucideLock" aria-hidden="true" />
+    Edit
+  </button>
+  } @else {
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    class="hover:border-destructive/40 hover:text-destructive"
+    (click)="toDelete.set(current)"
+  >
+    <ng-icon name="lucideTrash2" aria-hidden="true" />
+    Delete
+  </button>
+  <a hlmBtn routerLink="edit">
+    <ng-icon name="lucidePencil" aria-hidden="true" />
+    Edit
+  </a>
+  }
+</app-page-header>
+
+<div class="grid items-start gap-6 lg:grid-cols-2">
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="endpoint-heading"
+  >
+    <h2 id="endpoint-heading" class="font-semibold">Endpoint</h2>
+    <p class="text-muted-foreground mt-1 text-sm">
+      EUDIPLO posts presentation results, issuance notifications and wallet unit revocations here.
+    </p>
+    <dl class="mt-4 divide-y text-sm">
+      <div class="flex gap-3 py-3">
+        <dt class="text-muted-foreground w-28 shrink-0">ID</dt>
+        <dd class="min-w-0 font-mono text-[0.8rem] break-all">{{ current.id }}</dd>
+      </div>
+      <div class="flex gap-3 py-3">
+        <dt class="text-muted-foreground w-28 shrink-0">URL</dt>
+        <dd class="flex min-w-0 items-start gap-1">
+          <span class="font-mono text-[0.8rem] break-all">{{ current.url }}</span>
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground hover:bg-muted grid size-6 shrink-0 place-items-center rounded-md"
+            aria-label="Copy the URL"
+            hlmTooltip="Copy URL"
+            (click)="copyUrl(current.url)"
+          >
+            <ng-icon name="lucideCopy" class="text-[0.8rem]" />
+          </button>
+        </dd>
+      </div>
+      <div class="flex gap-3 py-3">
+        <dt class="text-muted-foreground w-28 shrink-0">Host</dt>
+        <dd class="min-w-0 break-all">{{ hostOf(current.url) }}</dd>
+      </div>
+    </dl>
+  </section>
+
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="auth-heading"
+  >
+    <h2 id="auth-heading" class="font-semibold">Authentication</h2>
+    @if (current.auth.type === 'apiKey') {
+    <div class="mt-4 flex items-start gap-3">
+      <span
+        class="bg-primary/8 text-primary dark:bg-primary/15 grid size-9 shrink-0 place-items-center rounded-xl"
+        aria-hidden="true"
+      >
+        <ng-icon name="lucideKeyRound" />
+      </span>
+      <div class="min-w-0 text-sm">
+        <p class="font-medium">API key</p>
+        <p class="text-muted-foreground mt-0.5">
+          EUDIPLO sends the stored key in the header
+          <code class="bg-muted rounded px-1 py-0.5 font-mono text-xs">{{ headerOf(current) }}</code
+          >. The key is never shown.
+        </p>
+      </div>
+    </div>
+    } @else {
+    <div class="mt-4 flex items-start gap-3">
+      <span
+        class="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-xl"
+        aria-hidden="true"
+      >
+        <ng-icon name="lucideShieldOff" />
+      </span>
+      <div class="min-w-0 text-sm">
+        <p class="font-medium">None</p>
+        <p class="text-muted-foreground mt-0.5">EUDIPLO calls the endpoint without credentials.</p>
+      </div>
+    </div>
+    }
+  </section>
+
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 lg:col-span-2 dark:ring-white/8"
+    aria-labelledby="users-heading"
+  >
+    <h2 id="users-heading" class="font-semibold">Used by</h2>
+    @if (users.failed()) {
+    <p class="text-muted-foreground mt-2 text-sm">
+      The configurations could not be loaded.
+      <button
+        hlmBtn
+        variant="link"
+        size="sm"
+        type="button"
+        class="h-auto p-0"
+        (click)="users.retry()"
+      >
+        Retry
+      </button>
+    </p>
+    } @else if (users.users() === undefined) {
+    <hlm-skeleton class="mt-4 h-10 w-full rounded-lg" />
+    } @else if (!usedBy().length) {
+    <p class="text-muted-foreground mt-2 text-sm">
+      No configuration you can see sends its notifications here. Issuance offers can still name it.
+    </p>
+    } @else {
+    <p class="text-muted-foreground mt-1 text-sm">
+      Credential types send it the revocations of their wallet units; presentation configurations
+      the result of each presentation.
+    </p>
+    <ul class="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+      @for (user of usedBy(); track user.kind + user.id) {
+      <li>
+        <a
+          [routerLink]="user.link"
+          class="hover:bg-muted/60 flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2.5"
+        >
+          <ng-icon
+            [name]="user.kind === 'credential' ? 'lucideIdCard' : 'lucideScanLine'"
+            class="text-muted-foreground shrink-0"
+            aria-hidden="true"
+          />
+          <span class="min-w-0">
+            <span class="block truncate text-sm font-medium">{{ user.name }}</span>
+            <span class="text-muted-foreground block truncate text-xs"
+              >{{ user.kind === 'credential' ? 'Credential type' : 'Presentation configuration' }} ·
+              <span class="font-mono">{{ user.id }}</span></span
+            >
+          </span>
+        </a>
+      </li>
+      }
+    </ul>
+    } @if (users.partial()) {
+    <p class="text-muted-foreground mt-3 text-xs">
+      Your roles do not show every kind of configuration, so others may use this endpoint too.
+    </p>
+    }
+  </section>
+</div>
+
+<app-delete-webhook-endpoint-dialog
+  [endpoint]="toDelete()"
+  [usedBy]="usedByIds()"
+  (closed)="toDelete.set(null)"
+  (deleted)="onDeleted()"
+/>
+}

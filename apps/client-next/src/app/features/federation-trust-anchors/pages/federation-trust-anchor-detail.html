@@ -1,0 +1,233 @@
+@if (anchor.isPending()) {
+<div role="status" aria-label="Loading federation trust anchor" class="grid max-w-4xl gap-4">
+  <hlm-skeleton class="h-24 w-full rounded-2xl" />
+  <hlm-skeleton class="h-64 w-full rounded-2xl" />
+</div>
+} @else if (anchor.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  @if (notFound(anchor.error())) {
+  <p class="font-semibold">There is no federation trust anchor {{ id() }}</p>
+  } @else {
+  <p class="font-semibold">The federation trust anchor could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(anchor.error()) }}</p>
+  <button hlmBtn variant="outline" type="button" (click)="anchor.refetch()">Retry</button>
+  }
+  <a hlmBtn variant="ghost" routerLink="/federation-trust-anchor">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    All trust anchors
+  </a>
+</section>
+} @else if (anchor.data(); as trustAnchor) {
+<app-ownership-notice kind="FederationTrustAnchor" [resource]="managed()" />
+
+<app-page-header
+  [heading]="trustAnchor.description || trustAnchor.id"
+  description="Registered OpenID Federation trust anchor and pinned public signing keys."
+>
+  <a hlmBtn variant="outline" routerLink="/federation-trust-anchor">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    All trust anchors
+  </a>
+  @if (documents.canDownload('FederationTrustAnchor')) {
+  <button
+    hlmBtn
+    variant="outline"
+    size="icon"
+    type="button"
+    aria-label="Download configuration"
+    hlmTooltip="Download configuration"
+    [attr.aria-disabled]="downloading() || null"
+    [attr.aria-busy]="downloading() || null"
+    (click)="download()"
+  >
+    @if (downloading()) {
+    <hlm-spinner class="size-4" />
+    } @else {
+    <ng-icon name="lucideDownload" />
+    }
+  </button>
+  } @if (!locked()) {
+  <a hlmBtn variant="outline" [routerLink]="['/federation-trust-anchor', id(), 'edit']">
+    <ng-icon name="lucidePencil" aria-hidden="true" />
+    Edit
+  </a>
+  } @else {
+  <span id="anchor-locked" class="sr-only">{{ locked() }}</span>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    aria-disabled="true"
+    aria-describedby="anchor-locked"
+    [hlmTooltip]="locked()"
+    (click)="lockedAction(locked())"
+  >
+    <ng-icon name="lucideLock" aria-hidden="true" />
+    Edit
+  </button>
+  } @if (locked()) {
+  <span id="anchor-delete-locked" class="sr-only">{{ locked() }}</span>
+  <button
+    hlmBtn
+    variant="destructive"
+    type="button"
+    aria-disabled="true"
+    aria-describedby="anchor-delete-locked"
+    [hlmTooltip]="locked()"
+    (click)="lockedAction(locked())"
+  >
+    <ng-icon name="lucideLock" aria-hidden="true" />
+    Delete
+  </button>
+  } @else {
+  <button
+    hlmBtn
+    variant="destructive"
+    type="button"
+    [attr.aria-disabled]="deleting() || referencesLoading() ? 'true' : null"
+    [attr.aria-describedby]="referencesLoading() ? 'checking-references' : null"
+    [hlmTooltip]="referencesLoading() ? 'Checking configuration references' : 'Delete trust anchor'"
+    (click)="delete()"
+  >
+    <ng-icon name="lucideTrash2" aria-hidden="true" />
+    {{ deleting() ? 'Deleting…' : 'Delete' }}
+  </button>
+  }
+</app-page-header>
+
+<div class="grid max-w-4xl gap-6">
+  <section class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8">
+    <h2 class="font-semibold">Trust anchor</h2>
+    <dl class="grid gap-3 sm:grid-cols-[10rem_1fr]">
+      <dt class="text-muted-foreground text-sm">ID</dt>
+      <dd class="font-mono text-sm">{{ trustAnchor.id }}</dd>
+      <dt class="text-muted-foreground text-sm">Entity ID</dt>
+      <dd class="flex min-w-0 items-center gap-2">
+        <code class="min-w-0 break-all text-sm">{{ trustAnchor.entityId }}</code>
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          type="button"
+          aria-label="Copy entity ID"
+          hlmTooltip="Copy entity ID"
+          (click)="copyEntityId(trustAnchor.entityId)"
+        >
+          <ng-icon name="lucideCopy" aria-hidden="true" />
+        </button>
+      </dd>
+      <dt class="text-muted-foreground text-sm">Description</dt>
+      <dd class="text-sm">{{ trustAnchor.description || '—' }}</dd>
+    </dl>
+  </section>
+
+  <section class="bg-card grid gap-4 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="font-semibold">Pinned federation keys</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          The federation's entity configuration must be signed with one of these public keys.
+        </p>
+      </div>
+      <button hlmBtn variant="outline" type="button" aria-label="Copy JWK set" (click)="copyJwks()">
+        <ng-icon name="lucideCopy" aria-hidden="true" />
+        Copy JWK set
+      </button>
+    </div>
+    @if (keys().length) {
+    <div hlmTableContainer>
+      <table hlmTable aria-label="Pinned federation keys">
+        <thead hlmTHead class="bg-muted/40">
+          <tr hlmTr class="hover:bg-transparent">
+            <th hlmTh scope="col">Key ID</th>
+            <th hlmTh scope="col">Type</th>
+            <th hlmTh scope="col">Curve</th>
+            <th hlmTh scope="col">Algorithm</th>
+            <th hlmTh scope="col">Use</th>
+          </tr>
+        </thead>
+        <tbody hlmTBody>
+          @for (key of keys(); track key.kid) {
+          <tr hlmTr>
+            <td hlmTd>{{ key.kid || '—' }}</td>
+            <td hlmTd>{{ key.kty || '—' }}</td>
+            <td hlmTd>{{ key.crv || '—' }}</td>
+            <td hlmTd>{{ key.alg || '—' }}</td>
+            <td hlmTd>{{ key.use || '—' }}</td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    } @else {
+    <p class="text-muted-foreground text-sm">No pinned keys are available.</p>
+    }
+    <details>
+      <summary class="cursor-pointer text-sm font-medium">View JWK set</summary>
+      <pre class="bg-muted mt-3 overflow-x-auto rounded-lg p-4 text-xs">{{ jwksJson() }}</pre>
+    </details>
+  </section>
+
+  <section class="bg-card grid gap-3 rounded-2xl p-5 ring-1 ring-black/5 dark:ring-white/8">
+    <h2 class="font-semibold">Configurations that name this entity ID</h2>
+    @if (!canReadIssuance()) {
+    <p class="text-muted-foreground text-sm">
+      You need the <code>issuance:manage</code> role to see whether the issuance configuration names
+      this trust anchor.
+    </p>
+    } @else if (issuance.isPending()) {
+    <p role="status" class="text-muted-foreground text-sm">Loading the issuance configuration…</p>
+    } @else if (issuance.isError()) {
+    <p role="alert" class="text-destructive text-sm">
+      The issuance configuration could not be loaded.
+    </p>
+    <button hlmBtn variant="outline" type="button" (click)="issuance.refetch()">Retry</button>
+    } @else if (references().issuance) {
+    <a hlmBtn variant="outline" class="justify-self-start" routerLink="/issuance-config">
+      Issuance configuration
+    </a>
+    } @else {
+    <p class="text-muted-foreground text-sm">
+      The issuance configuration does not name this anchor.
+    </p>
+    } @if (!canReadPresentations()) {
+    <p class="text-muted-foreground text-sm">
+      You need the <code>presentation:manage</code> role to see which presentation configurations
+      name this trust anchor.
+    </p>
+    } @else if (presentations.isPending()) {
+    <p role="status" class="text-muted-foreground text-sm">Loading presentation configurations…</p>
+    } @else if (presentations.isError()) {
+    <p role="alert" class="text-destructive text-sm">
+      Presentation configurations could not be loaded.
+    </p>
+    <button hlmBtn variant="outline" type="button" (click)="presentations.refetch()">Retry</button>
+    } @else if (references().presentations.length) { @for (config of references().presentations;
+    track config.id) {
+    <a
+      hlmBtn
+      variant="outline"
+      class="justify-self-start"
+      [routerLink]="['/presentation-config', config.id]"
+    >
+      {{ config.description || config.id }}
+    </a>
+    } } @else {
+    <p class="text-muted-foreground text-sm">No presentation configuration names this anchor.</p>
+    }
+  </section>
+</div>
+}
+
+<p id="checking-references" class="sr-only">
+  Checking which configurations name this trust anchor.
+</p>

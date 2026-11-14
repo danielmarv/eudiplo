@@ -1,0 +1,386 @@
+<app-page-header
+  heading="Keys"
+  description="Signing keys and certificate chains used by credentials, wallet requests, status lists and trust."
+>
+  <a hlmBtn variant="outline" routerLink="/kms">
+    <ng-icon name="lucideShieldCheck" aria-hidden="true" />
+    KMS providers
+  </a>
+  <a hlmBtn routerLink="create">
+    <ng-icon name="lucidePlus" aria-hidden="true" />
+    Create key
+  </a>
+</app-page-header>
+
+@if (defaultMissing(); as warning) {
+<div
+  class="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm"
+  role="alert"
+>
+  <ng-icon name="lucideTriangleAlert" class="text-destructive shrink-0" aria-hidden="true" />
+  <p class="min-w-0 flex-1">{{ warning }}</p>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    [attr.aria-disabled]="busy() || defaultLock() || null"
+    [hlmTooltip]="defaultLock()"
+    (click)="setDefault(null)"
+  >
+    Remove default
+  </button>
+</div>
+}
+
+<section
+  class="bg-card overflow-hidden rounded-2xl shadow-sm ring-1 ring-black/5 dark:ring-white/8"
+  aria-label="Key chains"
+>
+  <div class="flex flex-wrap items-center gap-3 border-b px-4 py-3.5 sm:px-5" [formGroup]="filters">
+    <label class="relative min-w-56 flex-1 sm:max-w-80">
+      <ng-icon
+        name="lucideSearch"
+        class="text-muted-foreground absolute top-1/2 left-3 -translate-y-1/2"
+        aria-hidden="true"
+      />
+      <input
+        hlmInput
+        class="h-9 w-full pl-9"
+        type="search"
+        aria-label="Search keys"
+        placeholder="Search name, ID, usage or provider"
+        formControlName="search"
+      />
+    </label>
+    <label class="sr-only" for="key-filter-usage">Filter by usage</label>
+    <hlm-native-select
+      class="w-44"
+      selectClass="h-9"
+      selectId="key-filter-usage"
+      formControlName="usage"
+    >
+      <option value="">All usages</option>
+      @for (usage of usages; track usage.value) {
+      <option [value]="usage.value">{{ usage.label }}</option>
+      }
+    </hlm-native-select>
+    <label class="sr-only" for="key-filter-type">Filter by key type</label>
+    <hlm-native-select
+      class="w-36"
+      selectClass="h-9"
+      selectId="key-filter-type"
+      formControlName="type"
+    >
+      <option value="">All types</option>
+      <option value="internalChain">Internal chain</option>
+      <option value="standalone">Standalone</option>
+    </hlm-native-select>
+    <label class="sr-only" for="key-filter-provider">Filter by KMS provider</label>
+    <hlm-native-select
+      class="w-40"
+      selectClass="h-9"
+      selectId="key-filter-provider"
+      formControlName="provider"
+    >
+      <option value="">All providers</option>
+      @for (provider of providers(); track provider) {
+      <option [value]="provider">{{ provider }}</option>
+      }
+    </hlm-native-select>
+    <button
+      hlmBtn
+      variant="ghost"
+      size="icon-sm"
+      type="button"
+      aria-label="Clear key filters"
+      hlmTooltip="Clear filters"
+      (click)="resetFilters()"
+    >
+      <ng-icon name="lucideX" aria-hidden="true" />
+    </button>
+  </div>
+
+  @if (defaultAccess.isError()) {
+  <div class="flex flex-wrap items-center gap-2 border-b px-4 py-2.5 text-sm" role="status">
+    <ng-icon name="lucideCircleAlert" class="text-muted-foreground" aria-hidden="true" />
+    <span class="text-muted-foreground"
+      >The default access key chain could not be loaded. Default marks and controls are
+      unavailable.</span
+    >
+    <button hlmBtn variant="link" size="sm" type="button" (click)="retryDefault()">
+      <ng-icon name="lucideRefreshCw" aria-hidden="true" />
+      Retry
+    </button>
+  </div>
+  } @if (keys.isPending()) {
+  <div class="grid gap-3 p-5" role="status" aria-label="Loading keys">
+    @for (row of [1, 2, 3]; track row) {
+    <hlm-skeleton class="h-14 w-full rounded-xl" />
+    }
+  </div>
+  } @else if (keys.isError()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center" role="alert">
+    <span
+      class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideTriangleAlert" class="text-xl" />
+    </span>
+    <p class="font-semibold">The keys could not be loaded</p>
+    <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(keys.error()) }}</p>
+    <button hlmBtn variant="outline" type="button" (click)="keys.refetch()">Retry</button>
+  </div>
+  } @else if (!keys.data()?.length) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <span
+      class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideKeyRound" class="text-xl" />
+    </span>
+    <p class="font-semibold">No keys configured</p>
+    <p class="text-muted-foreground max-w-md text-sm">
+      Create a key chain to sign credentials, wallet requests, status lists or trust data.
+    </p>
+    <a hlmBtn routerLink="create"><ng-icon name="lucidePlus" aria-hidden="true" />Create key</a>
+  </div>
+  } @else if (!matching().length) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <p class="font-semibold">No keys match these filters</p>
+    <p class="text-muted-foreground text-sm">Try a different search or clear the filters.</p>
+    <button hlmBtn variant="outline" type="button" (click)="resetFilters()">
+      <ng-icon name="lucideX" aria-hidden="true" />Clear filters
+    </button>
+  </div>
+  } @else {
+  <div hlmTableContainer>
+    <table hlmTable class="table-fixed">
+      <thead hlmTHead class="bg-muted/40">
+        <tr hlmTr class="hover:bg-transparent">
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground ps-4 pe-2 sm:ps-5 lg:w-[34%]"
+            [attr.aria-sort]="ariaSort(column('name'))"
+          >
+            <app-sort-toggle [column]="column('name')">Key chain</app-sort-toggle>
+          </th>
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground hidden px-3 md:table-cell"
+            [attr.aria-sort]="ariaSort(column('usage'))"
+          >
+            <app-sort-toggle [column]="column('usage')">Usage</app-sort-toggle>
+          </th>
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground hidden w-36 px-3 lg:table-cell"
+            [attr.aria-sort]="ariaSort(column('type'))"
+          >
+            <app-sort-toggle [column]="column('type')">Type</app-sort-toggle>
+          </th>
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground hidden w-32 px-3 xl:table-cell"
+            [attr.aria-sort]="ariaSort(column('kms'))"
+          >
+            <app-sort-toggle [column]="column('kms')">KMS</app-sort-toggle>
+          </th>
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground hidden w-32 px-3 sm:table-cell"
+            [attr.aria-sort]="ariaSort(column('rotation'))"
+          >
+            <app-sort-toggle [column]="column('rotation')">Rotation</app-sort-toggle>
+          </th>
+          <th hlmTh scope="col" class="w-40 pe-4 text-right sm:pe-5">
+            <span class="sr-only">Actions</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody hlmTBody>
+        @for (row of table.getRowModel().rows; track row.id) { @let key = row.original; @let lock =
+        keyLock(key); @let defaultMark = defaultChip(defaultAccess.data(), key.id);
+        <tr hlmTr>
+          <td hlmTd class="py-3 ps-4 sm:ps-5">
+            <div class="flex min-w-0 items-center gap-3">
+              <span
+                class="bg-accent text-accent-foreground grid size-9 shrink-0 place-items-center rounded-xl"
+                aria-hidden="true"
+              >
+                <ng-icon name="lucideKeyRound" />
+              </span>
+              <span class="min-w-0">
+                <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <a
+                    [routerLink]="key.id"
+                    class="max-w-full truncate font-semibold hover:underline"
+                    [title]="displayName(key)"
+                    >{{ displayName(key) }}</a
+                  >
+                  @if (defaultMark) {
+                  <span
+                    class="bg-primary/10 text-primary shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+                    [hlmTooltip]="defaultMark.description"
+                    >{{ defaultMark.label }}</span
+                  >
+                  }
+                </span>
+                <span class="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
+                  <span class="truncate font-mono">{{ key.id }}</span>
+                  @if (lock) {
+                  <span class="inline-flex items-center gap-1" [hlmTooltip]="lock">
+                    <ng-icon name="lucideLock" aria-hidden="true" />
+                    File managed
+                    <span class="sr-only">: {{ lock }}</span>
+                  </span>
+                  }
+                </span>
+              </span>
+            </div>
+          </td>
+          <td hlmTd class="hidden px-3 whitespace-normal md:table-cell">
+            {{ usageLabel(key.usageType) }}
+          </td>
+          <td hlmTd class="hidden px-3 lg:table-cell">
+            {{ key.type === 'internalChain' ? 'Internal chain' : 'Standalone' }}
+          </td>
+          <td hlmTd class="hidden px-3 xl:table-cell">
+            <span class="block truncate">{{ key.kmsProvider }}</span>
+          </td>
+          <td hlmTd class="hidden px-3 sm:table-cell">
+            @if (key.rotationPolicy.enabled) {
+            <span class="text-primary inline-flex items-center gap-1"
+              ><ng-icon name="lucideRotateCw" aria-hidden="true" />Enabled</span
+            >
+            } @else { <span class="text-muted-foreground">Disabled</span> }
+          </td>
+          <td hlmTd class="pe-4 sm:pe-5">
+            <div class="flex justify-end gap-1">
+              <a
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                class="hidden sm:inline-flex"
+                [routerLink]="key.id"
+                [attr.aria-label]="'View key chain ' + displayName(key)"
+                hlmTooltip="View details"
+              >
+                <ng-icon name="lucideArrowRight" aria-hidden="true" />
+              </a>
+              @if (lock) {
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                class="cursor-not-allowed opacity-50"
+                aria-disabled="true"
+                [attr.aria-label]="'Edit key chain ' + displayName(key)"
+                [hlmTooltip]="lock"
+                (click)="openEdit(key)"
+              >
+                <ng-icon name="lucidePencil" aria-hidden="true" />
+              </button>
+              } @else {
+              <a
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                [routerLink]="[key.id, 'edit']"
+                [attr.aria-label]="'Edit key chain ' + displayName(key)"
+                hlmTooltip="Edit"
+              >
+                <ng-icon name="lucidePencil" aria-hidden="true" />
+              </a>
+              } @if (key.usageType === 'access' && defaultAccess.isSuccess()) {
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                [attr.aria-label]="isDefault(defaultAccess.data(), key.id) ? 'Remove default access key chain ' + displayName(key) : 'Set default access key chain ' + displayName(key)"
+                [attr.aria-disabled]="busy() || defaultLock() || null"
+                [hlmTooltip]="defaultLock() || (isDefault(defaultAccess.data(), key.id) ? 'Stop using as default access key chain' : 'Use as default access key chain')"
+                (click)="setDefault(isDefault(defaultAccess.data(), key.id) ? null : key.id)"
+              >
+                <ng-icon
+                  [name]="isDefault(defaultAccess.data(), key.id) ? 'lucideStar' : 'lucideStarOff'"
+                  aria-hidden="true"
+                />
+              </button>
+              } @if (key.rotationPolicy.enabled) {
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                [attr.aria-label]="'Rotate key chain ' + displayName(key)"
+                [attr.aria-disabled]="busy() || lock || null"
+                [hlmTooltip]="lock || 'Rotate key now'"
+                (click)="requestRotation(key)"
+              >
+                <ng-icon name="lucideRefreshCw" aria-hidden="true" />
+              </button>
+              }
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                class="hover:text-destructive"
+                [attr.aria-label]="'Delete key chain ' + displayName(key)"
+                [attr.aria-disabled]="busy() || lock || null"
+                [hlmTooltip]="lock || 'Delete key chain'"
+                (click)="requestDelete(key)"
+              >
+                <ng-icon name="lucideTrash2" aria-hidden="true" />
+              </button>
+            </div>
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <app-table-pagination [table]="table" singular="key chain" plural="key chains" />
+  }
+</section>
+
+<hlm-alert-dialog
+  [state]="pendingAction() ? 'open' : 'closed'"
+  (stateChanged)="!$event.includes('open') && closeActionDialog()"
+>
+  <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+    <hlm-alert-dialog-header>
+      <h2 hlmAlertDialogTitle>
+        @if (pendingAction()?.kind === 'delete') { Delete this key chain? } @else { Rotate this key
+        chain now? }
+      </h2>
+      <p hlmAlertDialogDescription>
+        @if (pendingAction()?.kind === 'delete') { {{ deleteQuestion(pendingAction()) }} } @else if
+        (pendingAction(); as action) { The current signing key of {{ displayName(action.key) }}
+        moves to its previous-key grace period. A new key and certificate become active. }
+      </p>
+    </hlm-alert-dialog-header>
+    <hlm-alert-dialog-footer>
+      <button hlmAlertDialogCancel type="button" [disabled]="busy()" (click)="ctx.close()">
+        Cancel
+      </button>
+      <button
+        hlmAlertDialogAction
+        variant="destructive"
+        type="button"
+        [disabled]="busy()"
+        (click)="confirmAction()"
+      >
+        @if (busy()) { Working… } @else if (pendingAction()?.kind === 'delete') { Delete key chain }
+        @else { Rotate key chain }
+      </button>
+    </hlm-alert-dialog-footer>
+  </hlm-alert-dialog-content>
+</hlm-alert-dialog>

@@ -1,0 +1,613 @@
+@if (schema.isPending()) {
+<div role="status" aria-label="Loading the schema" class="grid gap-6">
+  <hlm-skeleton class="h-10 w-72 rounded-lg" />
+  <div class="grid gap-6 lg:grid-cols-2">
+    <hlm-skeleton class="h-56 rounded-2xl" />
+    <hlm-skeleton class="h-56 rounded-2xl" />
+  </div>
+</div>
+} @else if (schema.isError()) {
+<section
+  class="bg-card grid justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  @if (notFound(schema.error())) {
+  <h1 class="text-lg font-semibold">There is no schema {{ id() }}</h1>
+  <p class="text-muted-foreground max-w-md text-sm">
+    It may have been deleted at the registrar, or the address has a typo.
+  </p>
+  <a hlmBtn variant="outline" routerLink="/schema">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    All schemas
+  </a>
+  } @else {
+  <h1 class="text-lg font-semibold">The schema could not be loaded</h1>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(schema.error()) }}</p>
+  <p class="text-muted-foreground max-w-md text-sm">
+    The schema comes from the registrar; check its configuration if this keeps failing.
+  </p>
+  <div class="flex flex-wrap justify-center gap-2">
+    <button hlmBtn variant="outline" type="button" (click)="retry()">Retry</button>
+    <a hlmBtn variant="ghost" routerLink="/registrar">Registrar configuration</a>
+    <a hlmBtn variant="ghost" routerLink="/schema">All schemas</a>
+  </div>
+  }
+</section>
+} @else if (entry(); as current) {
+<app-page-header
+  [heading]="name()"
+  [description]="'Version ' + current.version + ' · ' + current.id"
+>
+  <button
+    hlmBtn
+    variant="outline"
+    size="icon"
+    type="button"
+    aria-label="Copy signed JWT"
+    hlmTooltip="Copy signed JWT"
+    (click)="copyJwt(current)"
+  >
+    <ng-icon name="lucideCopy" />
+  </button>
+  <button
+    hlmBtn
+    variant="outline"
+    size="icon"
+    type="button"
+    aria-label="Download signed JWT"
+    hlmTooltip="Download signed JWT"
+    (click)="download(current)"
+  >
+    <ng-icon name="lucideDownload" />
+  </button>
+  @if (!current.deprecated) {
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    [attr.aria-label]="'Deprecate version ' + current.version"
+    [attr.aria-disabled]="deprecate.isPending() || null"
+    [attr.aria-busy]="deprecate.isPending() || null"
+    (click)="deprecateVersion(current)"
+  >
+    @if (deprecate.isPending() && !publishing()) {
+    <hlm-spinner class="size-4" />
+    } @else {
+    <ng-icon name="lucideBan" aria-hidden="true" />
+    } Deprecate
+  </button>
+  }
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    class="hover:border-destructive/40 hover:text-destructive"
+    [attr.aria-label]="'Delete version ' + current.version"
+    [attr.aria-disabled]="remove.isPending() || null"
+    [attr.aria-busy]="remove.isPending() || null"
+    (click)="deleteVersion(current)"
+  >
+    @if (remove.isPending()) {
+    <hlm-spinner class="size-4" />
+    } @else {
+    <ng-icon name="lucideTrash2" aria-hidden="true" />
+    } Delete
+  </button>
+  @if (canManageIssuance()) {
+  <button
+    hlmBtn
+    type="button"
+    aria-controls="publish-panel"
+    [attr.aria-expanded]="publishOpen()"
+    (click)="togglePublish()"
+  >
+    <ng-icon name="lucideUpload" aria-hidden="true" />
+    New version
+  </button>
+  } @else {
+  <span id="publish-blocked" class="sr-only"
+    >Publishing a new version needs the issuance:manage role.</span
+  >
+  <button
+    hlmBtn
+    type="button"
+    class="cursor-not-allowed opacity-50"
+    aria-disabled="true"
+    aria-describedby="publish-blocked"
+    hlmTooltip="Publishing a new version needs the issuance:manage role."
+  >
+    <ng-icon name="lucideUpload" aria-hidden="true" />
+    New version
+  </button>
+  }
+</app-page-header>
+
+<h2 #heading tabindex="-1" class="sr-only">Version {{ current.version }}</h2>
+
+@if (schema.isFetching()) {
+<div
+  class="bg-primary/20 mb-4 h-0.5 overflow-hidden rounded-full"
+  role="status"
+  aria-label="Loading the version"
+>
+  <div class="bg-primary h-full w-1/3 animate-pulse rounded-full"></div>
+</div>
+}
+
+<div class="grid items-start gap-6">
+  @if (publishOpen()) {
+  <section
+    id="publish-panel"
+    class="bg-card ring-primary/25 rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 sm:p-6"
+    aria-labelledby="publish-heading"
+  >
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h2 id="publish-heading" class="font-semibold">Publish a new version</h2>
+        <p class="text-muted-foreground mt-1 max-w-2xl text-sm">
+          EUDIPLO signs the schema of version {{ current.version }} under a new version number and
+          submits it to the registrar. @if (current.displayName?.trim()) { It keeps the name,
+          category and tags. } @else { It keeps the category and tags and uses the ID as name. } {{
+          classificationNote() }} @if (metadataDirty()) { Unsaved changes under Catalog metadata are
+          not included; save them first. }
+        </p>
+      </div>
+      <button
+        hlmBtn
+        variant="ghost"
+        size="icon-sm"
+        type="button"
+        aria-label="Close"
+        hlmTooltip="Close"
+        (click)="togglePublish()"
+      >
+        <ng-icon name="lucideX" />
+      </button>
+    </div>
+
+    <form
+      #publishFormElement
+      class="mt-5 grid gap-5"
+      [formGroup]="publishForm"
+      (ngSubmit)="publish(current)"
+      novalidate
+    >
+      <div class="grid gap-x-6 gap-y-5 md:grid-cols-2">
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="new-version">New version</label>
+          <input
+            hlmInput
+            id="new-version"
+            class="h-10 font-mono text-sm"
+            formControlName="newVersion"
+            placeholder="1.1.0"
+            spellcheck="false"
+            autocomplete="off"
+          />
+          <p hlmFieldDescription>A semantic version, such as 1.2.0 or 1.2.0-rc.1.</p>
+          <hlm-field-error validator="required">Enter the new version.</hlm-field-error>
+          <hlm-field-error validator="pattern"
+            >Enter a semantic version, such as 1.2.0 or 1.2.0-rc.1.</hlm-field-error
+          >
+          <hlm-field-error validator="taken">This version exists already.</hlm-field-error>
+        </hlm-field>
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="rulebook-uri">Rulebook URI</label>
+          <input
+            hlmInput
+            id="rulebook-uri"
+            class="h-10 font-mono text-sm"
+            type="url"
+            formControlName="rulebookURI"
+            [placeholder]="current.rulebookURI"
+            spellcheck="false"
+          />
+          <p hlmFieldDescription>Leave it empty to keep the current one.</p>
+        </hlm-field>
+      </div>
+
+      <label class="flex cursor-pointer items-start gap-3 text-sm" for="deprecate-current">
+        <hlm-checkbox
+          class="mt-0.5"
+          inputId="deprecate-current"
+          formControlName="deprecateCurrent"
+        />
+        <span>
+          Deprecate version <span class="font-mono">{{ current.version }}</span>
+          <span class="text-muted-foreground block text-xs"
+            >The registrar names the new version as the one that supersedes it.</span
+          >
+        </span>
+      </label>
+
+      <div class="flex flex-wrap items-center justify-end gap-3">
+        @if (publishBlocked()) {
+        <p id="publish-reason" class="text-muted-foreground me-auto text-sm" role="status">
+          {{ publishBlocked() }} @if (configs.isError()) {
+          <button
+            hlmBtn
+            variant="link"
+            size="sm"
+            type="button"
+            class="h-auto p-0"
+            (click)="retrySources()"
+          >
+            Retry
+          </button>
+          }
+        </p>
+        }
+        <button hlmBtn variant="ghost" type="button" (click)="togglePublish()">Cancel</button>
+        <button
+          hlmBtn
+          type="submit"
+          [class.cursor-not-allowed]="!!publishBlocked()"
+          [class.opacity-50]="!!publishBlocked()"
+          [attr.aria-disabled]="publishing() || !!publishBlocked() || null"
+          [attr.aria-busy]="publishing() || null"
+          [attr.aria-describedby]="publishBlocked() ? 'publish-reason' : null"
+        >
+          @if (publishing()) {
+          <hlm-spinner class="size-4" />
+          Publishing… } @else { Publish version }
+        </button>
+      </div>
+    </form>
+  </section>
+  } @if (current.deprecated) {
+  <div
+    class="border-warning/30 bg-warning/8 flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm"
+    role="note"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-warning mt-0.5 shrink-0" aria-hidden="true" />
+    <p>
+      <span class="font-semibold">This version is deprecated.</span>
+      @let successor = current.supersededByVersion; @let note = current.deprecationMessage?.trim();
+      <!-- The message EUDIPLO writes names the successor, which the link names already. -->
+      @if (note && note !== 'Superseded by version ' + successor) { {{ note }} } @if (successor) {
+      Superseded by version
+      <a
+        class="font-mono font-medium underline-offset-2 hover:underline"
+        [routerLink]="['/schema', current.id]"
+        [queryParams]="{ version: successor }"
+        >{{ successor }}</a
+      >. }
+    </p>
+  </div>
+  }
+
+  <div class="grid items-start gap-6 lg:grid-cols-2">
+    <section
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+      aria-labelledby="overview-heading"
+    >
+      <h2 id="overview-heading" class="font-semibold">Overview</h2>
+      <dl class="mt-3 divide-y text-sm">
+        <div class="flex gap-3 py-3">
+          <dt class="text-muted-foreground w-32 shrink-0">Versions</dt>
+          <dd class="min-w-0">
+            <ul class="flex flex-wrap gap-1.5" aria-label="Versions">
+              @for (version of versions(); track version) {
+              <li>
+                <a
+                  class="inline-block rounded-md px-2 py-0.5 font-mono text-xs"
+                  [class]="
+                    version === current.version
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted hover:bg-muted/70'
+                  "
+                  [attr.aria-current]="version === current.version ? 'page' : null"
+                  [routerLink]="['/schema', current.id]"
+                  [queryParams]="{ version }"
+                  >{{ version }}</a
+                >
+              </li>
+              }
+            </ul>
+          </dd>
+        </div>
+        <div class="flex gap-3 py-3">
+          <dt class="text-muted-foreground w-32 shrink-0">ID</dt>
+          <dd class="min-w-0 font-mono text-[0.8rem] break-all">{{ current.id }}</dd>
+        </div>
+        <div class="flex gap-3 py-3">
+          <dt class="text-muted-foreground w-32 shrink-0">Issuer</dt>
+          <dd class="min-w-0 break-all">{{ current.issuer }}</dd>
+        </div>
+        <div class="flex gap-3 py-3">
+          <dt class="text-muted-foreground w-32 shrink-0">Level of security</dt>
+          <dd class="min-w-0">{{ losLabel(current.attestationLoS) }}</dd>
+        </div>
+        <div class="flex gap-3 py-3">
+          <dt class="text-muted-foreground w-32 shrink-0">Binding</dt>
+          <dd class="min-w-0">{{ bindingLabel(current.bindingType) }}</dd>
+        </div>
+        <div class="flex gap-3 py-3">
+          <dt class="text-muted-foreground w-32 shrink-0">Rulebook</dt>
+          <dd class="min-w-0 font-mono text-[0.8rem] break-all">
+            <a class="hover:underline" [href]="current.rulebookURI" target="_blank" rel="noopener"
+              >{{ current.rulebookURI }}</a
+            >
+          </dd>
+        </div>
+        <div class="flex gap-3 py-3">
+          <dt class="text-muted-foreground w-32 shrink-0">Category</dt>
+          <dd class="min-w-0">{{ current.category || 'None' }}</dd>
+        </div>
+        <div class="flex gap-3 py-3">
+          <dt class="text-muted-foreground w-32 shrink-0">Tags</dt>
+          <dd class="flex min-w-0 flex-wrap gap-1.5">
+            @for (tag of current.tags ?? []; track tag) {
+            <span class="bg-muted rounded-full px-2 py-0.5 text-xs">{{ tag }}</span>
+            } @empty { None }
+          </dd>
+        </div>
+        <div class="flex gap-3 py-3">
+          <dt class="text-muted-foreground w-32 shrink-0">Created</dt>
+          <dd class="min-w-0">{{ dateTime(current.createdAt) }}</dd>
+        </div>
+        <div class="flex gap-3 py-3">
+          <dt class="text-muted-foreground w-32 shrink-0">Updated</dt>
+          <dd class="min-w-0">{{ dateTime(current.updatedAt) }}</dd>
+        </div>
+      </dl>
+    </section>
+
+    <div class="grid gap-6">
+      @if (jwtUrl()) {
+      <section
+        class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="jwt-heading"
+      >
+        <h2 id="jwt-heading" class="font-semibold">JWT URL</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          Where the registrar serves the signed schema metadata of this version.
+        </p>
+        <div class="bg-muted/50 mt-3 flex items-start gap-1 rounded-lg px-3 py-2">
+          <span class="min-w-0 flex-1 font-mono text-[0.8rem] break-all">{{ jwtUrl() }}</span>
+          <button
+            hlmBtn
+            variant="ghost"
+            size="icon-sm"
+            type="button"
+            aria-label="Copy the JWT URL"
+            hlmTooltip="Copy JWT URL"
+            (click)="copyJwtUrl()"
+          >
+            <ng-icon name="lucideCopy" />
+          </button>
+          <a
+            hlmBtn
+            variant="ghost"
+            size="icon-sm"
+            [href]="jwtUrl()"
+            target="_blank"
+            rel="noopener"
+            aria-label="Open the JWT URL"
+            hlmTooltip="Open JWT URL"
+          >
+            <ng-icon name="lucideExternalLink" />
+          </a>
+        </div>
+      </section>
+      }
+
+      <section
+        class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="authorities-heading"
+      >
+        <h2 id="authorities-heading" class="font-semibold">Trusted authorities</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          Who wallets and relying parties accept as issuers of this credential type.
+        </p>
+        @if (authorities().length) {
+        <ul class="mt-3 grid gap-2">
+          @for (authority of authorities(); track authority.value) {
+          <li class="flex min-w-0 items-start gap-3 rounded-xl border px-3 py-2.5">
+            <ng-icon
+              name="lucideShieldCheck"
+              class="text-muted-foreground mt-0.5 shrink-0"
+              aria-hidden="true"
+            />
+            <span class="min-w-0 flex-1">
+              <span class="text-muted-foreground block text-xs">{{ authority.frameworkType }}</span>
+              <span class="block font-mono text-[0.8rem] break-all">{{ authority.value }}</span>
+            </span>
+            @if (authority.trustListId && canOpenTrustLists()) {
+            <a
+              hlmBtn
+              variant="ghost"
+              size="icon-sm"
+              [routerLink]="['/trust-list', authority.trustListId]"
+              [attr.aria-label]="'Open trust list ' + authority.trustListId"
+              hlmTooltip="Open trust list"
+            >
+              <ng-icon name="lucideExternalLink" />
+            </a>
+            }
+          </li>
+          }
+        </ul>
+        } @else {
+        <p class="text-muted-foreground mt-3 text-sm">This version names no trusted authority.</p>
+        }
+      </section>
+
+      <section
+        class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="linked-heading"
+      >
+        <h2 id="linked-heading" class="font-semibold">Linked credential types</h2>
+        @if (!canManageIssuance()) {
+        <p class="text-muted-foreground mt-2 text-sm">
+          Listing the credential types that link to this schema needs the issuance:manage role.
+        </p>
+        } @else if (configs.isPending()) {
+        <hlm-skeleton class="mt-3 h-10 w-full rounded-lg" />
+        } @else if (configs.isError()) {
+        <p class="text-muted-foreground mt-2 text-sm">
+          The credential types could not be loaded.
+          <button
+            hlmBtn
+            variant="link"
+            size="sm"
+            type="button"
+            class="h-auto p-0"
+            (click)="retrySources()"
+          >
+            Retry
+          </button>
+        </p>
+        } @else if (linked().length) {
+        <ul class="mt-3 grid gap-2">
+          @for (config of linked(); track config.id) {
+          <li>
+            <a
+              [routerLink]="['/credential-config', config.id]"
+              class="hover:bg-muted/60 flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2.5"
+            >
+              <ng-icon
+                name="lucideFileText"
+                class="text-muted-foreground shrink-0"
+                aria-hidden="true"
+              />
+              <span class="min-w-0">
+                <span class="block truncate text-sm font-medium">{{ configName(config) }}</span>
+                <span class="text-muted-foreground block truncate font-mono text-xs"
+                  >{{ config.id }}</span
+                >
+              </span>
+            </a>
+          </li>
+          }
+        </ul>
+        } @else {
+        <p class="text-muted-foreground mt-2 text-sm">No credential type links to this schema.</p>
+        }
+      </section>
+    </div>
+  </div>
+
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="metadata-heading"
+  >
+    <h2 id="metadata-heading" class="font-semibold">Catalog metadata</h2>
+    <p class="text-muted-foreground mt-1 text-sm">
+      How the registrar's catalog lists version {{ current.version }}. Saving sends only the fields
+      you changed.
+    </p>
+    <form
+      class="mt-5 grid gap-5"
+      [formGroup]="metadataForm"
+      (ngSubmit)="saveMetadata(current)"
+      novalidate
+    >
+      <div class="grid gap-x-6 gap-y-5 md:grid-cols-2">
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="schema-name">Name</label>
+          <input
+            hlmInput
+            id="schema-name"
+            class="h-10"
+            formControlName="displayName"
+            placeholder="German PID"
+          />
+          <p hlmFieldDescription>Without a name, the catalog shows the ID.</p>
+        </hlm-field>
+        <hlm-field class="content-start gap-2">
+          <label hlmFieldLabel for="schema-category">Category</label>
+          <hlm-native-select
+            class="w-full"
+            selectClass="h-10"
+            selectId="schema-category"
+            formControlName="category"
+          >
+            <option value="" [selected]="!metadataForm.controls.category.value">None</option>
+            @for (option of categories(); track option.code) {
+            <option
+              [value]="option.code"
+              [disabled]="option.status === 'deprecated'"
+              [selected]="metadataForm.controls.category.value === option.code"
+            >
+              {{ vocabularyLabel(option) }}
+            </option>
+            }
+          </hlm-native-select>
+          @if (vocabularies.isPending()) {
+          <p hlmFieldDescription role="status">Loading the categories…</p>
+          } @else if (vocabularies.isError()) {
+          <p hlmFieldDescription>The categories could not be loaded from the registrar.</p>
+          }
+        </hlm-field>
+      </div>
+
+      <fieldset class="min-w-0">
+        <legend class="mb-2 text-sm font-medium">Tags</legend>
+        @if (vocabularies.isPending()) {
+        <hlm-skeleton class="h-16 w-full rounded-lg" />
+        } @else if (vocabularies.isError()) {
+        <p class="text-muted-foreground text-sm">
+          The tags could not be loaded from the registrar.
+          <button
+            hlmBtn
+            variant="link"
+            size="sm"
+            type="button"
+            class="h-auto p-0"
+            (click)="retrySources()"
+          >
+            Reload categories and tags
+          </button>
+        </p>
+        } @else if (!tags().length) {
+        <p class="text-muted-foreground text-sm">The registrar offers no tags.</p>
+        } @else {
+        <div class="grid gap-0.5 sm:grid-cols-2 lg:grid-cols-3">
+          @for (tag of tags(); track tag.code) { @let deprecated = tag.status === 'deprecated'; @let
+          checked = selectedTags().includes(tag.code);
+          <label
+            class="has-[[data-state=checked]]:bg-primary/5 flex items-start gap-3 rounded-lg px-2.5 py-2"
+            [class.cursor-pointer]="!deprecated || checked"
+            [class.hover:bg-muted/60]="!deprecated || checked"
+            [for]="'tag-' + tag.code"
+          >
+            <hlm-checkbox
+              class="mt-0.5"
+              [inputId]="'tag-' + tag.code"
+              [checked]="checked"
+              [disabled]="deprecated && !checked"
+              (checkedChange)="toggleTag(tag.code, $event === true)"
+            />
+            <span class="min-w-0 text-sm">{{ vocabularyLabel(tag) }}</span>
+          </label>
+          }
+        </div>
+        }
+      </fieldset>
+
+      <div class="flex justify-end">
+        <button
+          hlmBtn
+          type="submit"
+          [class.cursor-not-allowed]="!metadataDirty()"
+          [class.opacity-50]="!metadataDirty()"
+          [attr.aria-disabled]="update.isPending() || !metadataDirty() || null"
+          [attr.aria-busy]="update.isPending() || null"
+          [hlmTooltip]="metadataDirty() ? '' : 'No changes to save'"
+        >
+          @if (update.isPending()) {
+          <hlm-spinner class="size-4" />
+          Saving… } @else { Save metadata }
+        </button>
+      </div>
+    </form>
+  </section>
+</div>
+}
