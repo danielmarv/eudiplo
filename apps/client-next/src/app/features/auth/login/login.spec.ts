@@ -666,7 +666,11 @@ describe('Login with a kept session', () => {
     api.kept = false;
     history.replaceState(
       {
-        signInAs: { clientId: 'acme-admin', clientSecret: 'example-secret', apiUrl: 'http://backend.test' },
+        signInAs: {
+          clientId: 'acme-admin',
+          clientSecret: 'example-secret',
+          apiUrl: 'http://backend.test',
+        },
       },
       ''
     );

@@ -79,7 +79,10 @@ describe('user pages', () => {
             return json({ statusCode: 501, message: 'Keycloak manages no people here.' }, 501);
           }
           if (call.method === 'POST') {
-            return json({ id: 'u3', ...(body as object), temporaryPassword: 'example-password' }, 201);
+            return json(
+              { id: 'u3', ...(body as object), temporaryPassword: 'example-password' },
+              201
+            );
           }
           return json(users);
         }

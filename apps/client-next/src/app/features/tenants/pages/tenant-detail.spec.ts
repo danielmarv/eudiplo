@@ -86,7 +86,8 @@ describe('TenantDetail', () => {
         if (req.method === 'DELETE') return json(null, 204);
         if (path === '/api/tenant/acme') return json(tenant);
         if (path === '/api/tenant') return json([tenant]);
-        if (path === '/api/client/acme-issuer/rotate-secret') return json({ secret: 'rotated-secret' }, 201);
+        if (path === '/api/client/acme-issuer/rotate-secret')
+          return json({ secret: 'rotated-secret' }, 201);
         return json({ statusCode: 404, message: 'Tenant not found' }, 404);
       },
     });

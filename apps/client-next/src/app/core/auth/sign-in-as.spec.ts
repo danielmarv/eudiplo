@@ -9,7 +9,11 @@ import { signInAs, takeSignInAs } from './sign-in-as';
 class Blank {}
 
 describe('sign in as a client', () => {
-  const client = { clientId: 'acme-admin', clientSecret: 'example-secret', apiUrl: 'https://api.test' };
+  const client = {
+    clientId: 'acme-admin',
+    clientSecret: 'example-secret',
+    apiUrl: 'https://api.test',
+  };
 
   afterEach(() => history.replaceState(null, ''));
 
