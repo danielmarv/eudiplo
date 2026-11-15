@@ -42,7 +42,7 @@ interface RegistrationCertCache {
 }
 
 /** The cached registration certificate, if the backend has resolved one. */
-export function registrationCertCache(
+function registrationCertCache(
   config: Pick<PresentationConfig, 'registrationCertCache'>
 ): RegistrationCertCache | null {
   return (config.registrationCertCache as RegistrationCertCache | null | undefined) ?? null;

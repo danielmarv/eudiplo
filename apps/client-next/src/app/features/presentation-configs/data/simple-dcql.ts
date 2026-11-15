@@ -21,7 +21,7 @@ export type TrustedAuthority =
   | { type: 'etsi_tl'; values: TrustListReference[] }
   | { type: 'openid_federation'; values: string[] };
 
-export interface CredentialSetQuery {
+interface CredentialSetQuery {
   options: string[][];
   required?: boolean;
 }
@@ -47,7 +47,7 @@ const onlyKeys = (value: Record<string, unknown>, keys: string[]) =>
   Object.keys(value).every((key) => keys.includes(key));
 const identifier = /^[A-Za-z0-9_-]+$/;
 
-export function parseDcql(value: unknown): unknown {
+function parseDcql(value: unknown): unknown {
   try {
     return typeof value === 'string' ? JSON.parse(value) : value;
   } catch {
@@ -330,17 +330,4 @@ export function simpleDcqlError(query: SimpleDcql): string | null {
     }
   }
   return dcqlReferenceError(buildSimpleDcql(query));
-}
-
-export function trustSummary(authorities: TrustedAuthority[] | undefined): string {
-  if (!authorities?.length) return 'No issuer trust constraint configured';
-  return authorities
-    .flatMap((authority) =>
-      authority.type === 'openid_federation'
-        ? authority.values.map((id) => `Federation: ${id || 'Not selected'}`)
-        : authority.values.map(
-            (ref) => `Trust list: ${ref.trustListId || ref.url || 'Not selected'}`
-          )
-    )
-    .join(' · ');
 }

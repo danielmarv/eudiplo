@@ -4,7 +4,7 @@ export type SessionQuery = NonNullable<SessionControllerGetAllSessionsData['quer
 export type SessionStatus = Session['status'];
 export type SessionType = NonNullable<SessionQuery['type']>;
 export type SessionSortField = NonNullable<SessionQuery['sortBy']>;
-export type UpdatedWithin = '15m' | '1h' | '24h' | '7d';
+type UpdatedWithin = '15m' | '1h' | '24h' | '7d';
 export type UpdatedFilter = '' | UpdatedWithin | 'custom';
 
 export interface SessionListState {
@@ -29,7 +29,7 @@ export interface SessionQueryParamsReader {
   getAll(name: string): string[];
 }
 
-export const DEFAULT_SESSION_PAGE_SIZE = 25;
+const DEFAULT_SESSION_PAGE_SIZE = 25;
 export const SESSION_PAGE_SIZES = [10, 25, 50, 100] as const;
 
 const STATUSES = new Set<SessionStatus>([
