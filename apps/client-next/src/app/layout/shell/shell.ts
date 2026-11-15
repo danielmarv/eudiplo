@@ -2,6 +2,7 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  DestroyRef,
   effect,
   type ElementRef,
   inject,
@@ -26,6 +27,8 @@ import {
   lucideMoon,
   lucideSearch,
   lucideSun,
+  lucideTriangleAlert,
+  lucideX,
 } from '@ng-icons/lucide';
 import type { BrnDialogState } from '@spartan-ng/brain/dialog';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -35,6 +38,8 @@ import { HlmTooltipImports } from '@spartan-ng/helm/tooltip';
 import { injectQuery } from '@tanstack/angular-query-experimental';
 import { filter, map, startWith } from 'rxjs';
 import { CallerService } from '../../core/auth/caller.service';
+import { RoleChangeService } from '../../core/auth/role-change.service';
+import { TokenExpiryService } from '../../core/auth/token-expiry.service';
 import { type Role, TENANT_ADMIN_ROLES } from '../../core/auth/role-grants';
 import { SessionService } from '../../core/auth/session.service';
 import {
@@ -42,6 +47,7 @@ import {
   managesClients,
   managesUsers,
 } from '../../core/config/frontend-config';
+import { clientBuild, compareBuilds } from '../../core/config/build-info';
 import { ThemeService } from '../../core/config/theme.service';
 import { versionLabel, versionQuery } from '../../core/config/version';
 import { NotifyService } from '../../core/notify/notify.service';
@@ -92,6 +98,8 @@ interface Crumb {
       lucideMoon,
       lucideSearch,
       lucideSun,
+      lucideTriangleAlert,
+      lucideX,
     }),
   ],
   host: { '(document:keydown)': 'onKeydown($event)' },
@@ -114,6 +122,19 @@ export class Shell {
   private readonly frontendConfig = injectQuery(() => frontendConfigQuery(this.instanceUrl));
   protected readonly version = injectQuery(() => versionQuery(this.instanceUrl));
   protected readonly versionLabel = computed(() => versionLabel(this.version.data()?.version));
+  protected readonly clientVersion = clientBuild().version;
+  /** Whether this client and the backend come from different builds; then features may break. */
+  protected readonly versionMismatch = computed(() => {
+    const backend = this.version.data();
+    if (!backend?.version) return false;
+    return (
+      compareBuilds(clientBuild(), {
+        version: backend.version,
+        revision: (backend as { revision?: string }).revision || undefined,
+      }) === 'mismatch'
+    );
+  });
+  protected readonly versionWarningDismissed = signal(false);
 
   protected readonly caller = this.callers.loadedCaller;
 
@@ -240,6 +261,15 @@ export class Shell {
     : 'Ctrl K';
 
   constructor() {
+    // Expiring sessions, lost access and lost roles are reported on every page.
+    const tokenExpiry = inject(TokenExpiryService);
+    const roleChange = inject(RoleChangeService);
+    tokenExpiry.start();
+    roleChange.start();
+    inject(DestroyRef).onDestroy(() => {
+      tokenExpiry.stop();
+      roleChange.stop();
+    });
     // Opening a page opens its group, also one the user closed before.
     effect(() => {
       const group = this.current()?.group;

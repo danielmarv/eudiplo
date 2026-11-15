@@ -7,6 +7,11 @@ import {
   sessionControllerCancel,
   sessionControllerDeleteSession,
   sessionControllerGetAllSessions,
+  sessionControllerGetCredentialStatus,
+  sessionControllerGetSessionLogs,
+  sessionControllerRevokeAll,
+  type CredentialStatusDto,
+  type SessionLogEntryResponseDto,
   type PaginatedSessionResponseDto,
   type SessionStorageConfig,
   type UpdateSessionConfigDto,
@@ -89,6 +94,55 @@ export function deleteSessionMutation() {
   return mutationOptions({
     mutationFn: async (id: string): Promise<void> => {
       await sessionControllerDeleteSession({ path: { id } });
+    },
+  });
+}
+
+/**
+ * The log of a session (`GET /api/session/{id}/logs`). Empty when the instance keeps no session
+ * logs (`LOG_SESSION_STORE` off), which the backend answers with an error.
+ */
+export function sessionLogsQuery(instance: Instance, tenant: Tenant, id: string) {
+  return queryOptions({
+    queryKey: ['sessions', instance, tenant, id, 'logs'] as const,
+    queryFn: async (): Promise<SessionLogEntryResponseDto[]> => {
+      try {
+        return (await sessionControllerGetSessionLogs({ path: { id } })).data ?? [];
+      } catch {
+        return [];
+      }
+    },
+    enabled: !!instance && !!id,
+  });
+}
+
+/** The status of every credential an issuance session issued with one. */
+export function credentialStatusQuery(
+  instance: Instance,
+  tenant: Tenant,
+  id: string,
+  enabled: boolean
+) {
+  return queryOptions({
+    queryKey: ['sessions', instance, tenant, id, 'credential-status'] as const,
+    queryFn: async (): Promise<CredentialStatusDto[]> =>
+      (await sessionControllerGetCredentialStatus({ path: { id } })).data ?? [],
+    enabled: !!instance && !!id && enabled,
+  });
+}
+
+/**
+ * Sets the status of the credentials a session issued of one credential type
+ * (`POST /api/session/revoke`). Revocation is final.
+ */
+export function updateCredentialStatusMutation() {
+  return mutationOptions({
+    mutationFn: async (body: {
+      sessionId: string;
+      status: number;
+      credentialConfigurationId: string;
+    }): Promise<void> => {
+      await sessionControllerRevokeAll({ body });
     },
   });
 }

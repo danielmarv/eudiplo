@@ -32,6 +32,8 @@ import {
   type PaginationState,
   type SortingState,
 } from '@tanstack/angular-table';
+import { CallerService } from '../../../core/auth/caller.service';
+import { canManageRoles } from '../../../core/auth/role-grants';
 import { SessionService } from '../../../core/auth/session.service';
 import { frontendConfigQuery, managesClients } from '../../../core/config/frontend-config';
 import { getApiErrorMessage, hasHttpStatus } from '../../../core/errors/error-message';
@@ -50,6 +52,8 @@ import {
 } from '../../../shared/data-table/table-features';
 import { applyChange } from '../../../shared/data-table/table-state';
 import { TablePagination } from '../../../shared/data-table/table-pagination';
+import { ClientActions } from '../../clients/data/client-actions';
+import { ClientSecretDialog } from '../components/client-secret-dialog';
 import { DeleteTenantDialog } from '../components/delete-tenant-dialog';
 import { RoleCoverage } from '../components/role-coverage';
 import { SettingsCard } from '../components/settings-card';
@@ -88,11 +92,13 @@ const CLIENT_COLUMNS: ColumnDef<ListFeatures, ClientEntity>[] = [
     Guilloche,
     SortToggle,
     TablePagination,
+    ClientSecretDialog,
     DeleteTenantDialog,
     RoleCoverage,
     SettingsCard,
   ],
   providers: [
+    ClientActions,
     provideIcons({
       lucideArrowLeft,
       lucideCopy,
@@ -124,6 +130,16 @@ export class TenantDetail {
   );
 
   protected readonly clients = computed(() => this.tenant.data()?.clients ?? NO_CLIENTS);
+  protected readonly clientActions = inject(ClientActions);
+  private readonly caller = inject(CallerService).loadedCaller;
+  private readonly callerRoles = computed(() => this.caller()?.roles ?? []);
+
+  /** Why the caller cannot give `client` a new secret, or empty when it can. */
+  protected secretLock(client: ClientEntity): string {
+    return canManageRoles(this.callerRoles(), client.roles ?? [])
+      ? ''
+      : 'This client has roles you neither hold nor may grant.';
+  }
   protected readonly settings = computed(() => {
     const tenant = this.tenant.data();
     return {

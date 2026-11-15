@@ -340,7 +340,12 @@
             />
           </td>
           <td hlmTd class="max-w-0 ps-3">
-            <span class="font-mono text-xs [overflow-wrap:anywhere]">{{ session.id }}</span>
+            <a
+              class="font-mono text-xs [overflow-wrap:anywhere] hover:underline"
+              [routerLink]="session.id"
+              [attr.aria-label]="'Open session ' + session.id"
+              >{{ session.id }}</a
+            >
           </td>
           <td hlmTd class="hidden px-3 sm:table-cell">
             <span class="rounded-full border px-2.5 py-1 text-xs">

@@ -1,9 +1,10 @@
-import { Component } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { client } from '@eudiplo/sdk-core';
 import { provideTanStackQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { CallerService } from '../../../core/auth/caller.service';
 import { SessionService } from '../../../core/auth/session.service';
 import { NotifyService } from '../../../core/notify/notify.service';
 import { TenantDetail } from './tenant-detail';
@@ -85,6 +86,7 @@ describe('TenantDetail', () => {
         if (req.method === 'DELETE') return json(null, 204);
         if (path === '/api/tenant/acme') return json(tenant);
         if (path === '/api/tenant') return json([tenant]);
+        if (path === '/api/client/acme-issuer/rotate-secret') return json({ secret: 'n3w' }, 201);
         return json({ statusCode: 404, message: 'Tenant not found' }, 404);
       },
     });
@@ -96,7 +98,20 @@ describe('TenantDetail', () => {
           { path: 'tenants/:id/edit', component: Blank },
         ]),
         provideTanStackQuery(new QueryClient({ defaultOptions: { queries: { retry: false } } })),
-        { provide: SessionService, useValue: { getBaseUrl: () => 'http://backend.test' } },
+        {
+          provide: SessionService,
+          useValue: {
+            getBaseUrl: () => 'http://backend.test',
+            getClientId: () => 'root',
+            usesSso: () => false,
+          },
+        },
+        {
+          provide: CallerService,
+          useValue: {
+            loadedCaller: signal({ subject: 'root', tenantId: null, roles: ['tenants:manage'] }),
+          },
+        },
         { provide: NotifyService, useValue: notify },
       ],
     });
@@ -198,5 +213,15 @@ describe('TenantDetail', () => {
     await settle(() => expect(router.url).toBe('/tenants'));
     expect(requests).toContain('DELETE /api/tenant/acme');
     expect(notify.success).toHaveBeenCalledWith('Tenant Acme University deleted.');
+  });
+
+  it('gives a client a new secret after asking and shows it once', async () => {
+    const { settle } = await render('acme');
+    await settle(() => expect(button('Replace the secret of acme-issuer')).toBeDefined());
+    button('Replace the secret of acme-issuer')!.click();
+    await settle(() => expect(button('Replace secret')).toBeDefined());
+    button('Replace secret')!.click();
+    await settle(() => expect(text()).toContain('n3w'));
+    expect(requests).toContain('POST /api/client/acme-issuer/rotate-secret');
   });
 });

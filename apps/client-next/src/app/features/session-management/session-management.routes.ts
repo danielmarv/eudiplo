@@ -16,4 +16,10 @@ export const SESSION_MANAGEMENT_ROUTES: Routes = [
     canActivate: [requireRole('issuance:manage', 'presentation:manage')],
     loadComponent: () => import('./pages/session-settings').then((m) => m.SessionSettings),
   },
+  {
+    path: ':id',
+    title: 'Session',
+    canActivate: [requireRole('issuance:offer', 'presentation:request', 'sessions:read')],
+    loadComponent: () => import('./pages/session-detail').then((m) => m.SessionDetail),
+  },
 ];

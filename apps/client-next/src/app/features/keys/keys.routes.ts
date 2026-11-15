@@ -13,6 +13,8 @@ export const KEYS_ROUTES: Routes = [
         title: 'Keys',
         loadComponent: () => import('./pages/key-list').then((m) => m.KeyList),
       },
+      // The key providers moved to their own page; old links still lead there.
+      { path: 'providers', pathMatch: 'full', redirectTo: '/kms' },
       {
         path: 'create',
         title: 'Create key',

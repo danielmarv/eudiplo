@@ -10,6 +10,7 @@ import { RouterLink } from '@angular/router';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import {
   lucideBraces,
+  lucidePlugZap,
   lucideChevronRight,
   lucidePlus,
   lucideSearch,
@@ -46,6 +47,7 @@ import { dateTime } from '../../../shared/format/date-time';
 import { relativeTime } from '../../../shared/format/relative-time';
 import { PageHeader } from '../../../shared/pages/page-header';
 import { groupSchemas, type SchemaGroup } from '../data/schema-display';
+import { registrarConfigQuery } from '../../registrar/data/registrar-queries';
 import { mySchemasQuery } from '../data/schema-queries';
 
 const NO_GROUPS: SchemaGroup[] = [];
@@ -85,6 +87,7 @@ const COLUMNS: ColumnDef<ListFeatures, SchemaGroup>[] = [
   providers: [
     provideIcons({
       lucideBraces,
+      lucidePlugZap,
       lucideChevronRight,
       lucidePlus,
       lucideSearch,
@@ -99,7 +102,19 @@ export class SchemaList {
   private readonly caller = inject(CallerService).loadedCaller;
   private readonly tenant = computed(() => this.caller()?.tenantId);
 
-  protected readonly schemas = injectQuery(() => mySchemasQuery(this.instance, this.tenant()));
+  /** The registrar connection; the schemas live there, so without one there is nothing to list. */
+  private readonly registrar = injectQuery(() =>
+    registrarConfigQuery(this.instance, this.tenant())
+  );
+  /** Whether the tenant has no registrar configured yet (the backend answers 404 then). */
+  protected readonly notConfigured = computed(() => this.registrar.data() === null);
+  protected readonly schemas = injectQuery(() =>
+    mySchemasQuery(
+      this.instance,
+      this.tenant(),
+      this.registrar.data() != null || this.registrar.isError()
+    )
+  );
   protected readonly groups = computed(() =>
     this.schemas.data() ? groupSchemas(this.schemas.data()!) : NO_GROUPS
   );

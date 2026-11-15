@@ -1,27 +1,8 @@
-import type { Route, Routes } from '@angular/router';
+import type { Routes } from '@angular/router';
 import { authGuard, requireRole } from './core/auth/guards';
 import { type Role, TENANT_ADMIN_ROLES } from './core/auth/role-grants';
 import { KEY_CHAIN_ROLES } from './layout/navigation';
 import { Shell } from './layout/shell/shell';
-
-/**
- * A page of the current Web Client that is not rebuilt yet: the placeholder for it and every
- * page below it, behind the same roles. Replace it with the feature's own routes when the
- * feature moves (see README.md).
- */
-function pending(path: string, title: string, roles: Role[] = []): Route {
-  return {
-    path,
-    title,
-    canActivate: roles.length ? [requireRole(...roles)] : [],
-    children: [
-      {
-        path: '**',
-        loadComponent: () => import('./shared/pages/pending-page').then((m) => m.PendingPage),
-      },
-    ],
-  };
-}
 
 const ISSUES_OR_VERIFIES: Role[] = ['issuance:manage', 'presentation:manage'];
 
@@ -168,6 +149,10 @@ export const routes: Routes = [
         loadChildren: () =>
           import('./features/schemas/schemas.routes').then((m) => m.SCHEMA_ROUTES),
       },
+      // Earlier addresses of the schema pages.
+      { path: 'schema-metadata', pathMatch: 'full', redirectTo: 'schema' },
+      { path: 'schema-metadata/create', redirectTo: 'schema/create' },
+      { path: 'schema-metadata/:id', redirectTo: 'schema/:id' },
 
       // Administration
       {
@@ -183,7 +168,12 @@ export const routes: Routes = [
         loadChildren: () =>
           import('./features/clients/clients.routes').then((m) => m.CLIENT_ROUTES),
       },
-      pending('users', 'Users', ['users:manage']),
+      {
+        path: 'users',
+        title: 'Users',
+        canActivate: [requireRole('users:manage')],
+        loadChildren: () => import('./features/users/users.routes').then((m) => m.USER_ROUTES),
+      },
       {
         path: 'admin/activity-logs',
         title: 'Activity log',

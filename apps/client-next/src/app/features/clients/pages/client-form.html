@@ -93,61 +93,14 @@
     <section
       class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
     >
-      @let rolesError = form.controls.roles.invalid && form.controls.roles.touched;
-      <fieldset class="min-w-0" aria-describedby="roles-hint">
-        <legend class="font-semibold">Roles</legend>
-        <p id="roles-hint" class="text-muted-foreground mt-1 text-sm">{{ grantHint() }}</p>
-        <div class="@container mt-4">
-          <div class="grid gap-x-8 gap-y-5 @2xl:grid-cols-2">
-            @for (group of roleGroups(); track group.label) {
-            <fieldset class="min-w-0">
-              <legend class="text-muted-foreground mb-1.5 text-xs font-medium">
-                {{ group.label }}
-              </legend>
-              <div class="grid gap-0.5">
-                @for (option of group.roles; track option.role) {
-                <label
-                  class="has-[[data-state=checked]]:bg-primary/5 flex items-start gap-3 rounded-lg px-2.5 py-2"
-                  [class.cursor-pointer]="!option.locked && !locked()"
-                  [class.hover:bg-muted/60]="!option.locked && !locked()"
-                  [for]="'role-' + option.role"
-                >
-                  <hlm-checkbox
-                    class="mt-0.5"
-                    [inputId]="'role-' + option.role"
-                    [checked]="selectedRoles().includes(option.role)"
-                    [disabled]="option.locked || !!locked()"
-                    [attr.aria-invalid]="rolesError || null"
-                    [aria-describedby]="'role-' + option.role + '-hint'"
-                    (checkedChange)="toggleRole(option.role, $event === true)"
-                  />
-                  <span class="min-w-0">
-                    <span class="flex flex-wrap items-baseline gap-x-2">
-                      <span class="font-mono text-[0.8125rem] font-medium">{{ option.role }}</span>
-                      @if (option.locked) {
-                      <span class="text-muted-foreground inline-flex items-center gap-1 text-xs">
-                        <ng-icon name="lucideLock" aria-hidden="true" />
-                        you cannot change it
-                      </span>
-                      }
-                    </span>
-                    <span
-                      class="text-muted-foreground block text-xs leading-snug"
-                      [id]="'role-' + option.role + '-hint'"
-                      >{{ descriptions[option.role] }}</span
-                    >
-                  </span>
-                </label>
-                }
-              </div>
-            </fieldset>
-            }
-          </div>
-        </div>
-        @if (rolesError) {
-        <p class="text-destructive mt-3 text-sm">Choose at least one role.</p>
-        }
-      </fieldset>
+      <app-role-choices
+        [callerRoles]="callerRoles()"
+        [storedRoles]="client.data()?.roles ?? []"
+        [selected]="selectedRoles()"
+        [disabled]="!!locked()"
+        [invalid]="form.controls.roles.invalid && form.controls.roles.touched"
+        (selectedChange)="setRoles($event)"
+      />
     </section>
 
     <section

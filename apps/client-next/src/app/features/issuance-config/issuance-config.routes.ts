@@ -2,8 +2,7 @@ import type { Routes } from '@angular/router';
 
 /**
  * The issuer settings pages, under `/issuance-config` and behind `issuance:manage`
- * (app.routes.ts). The settings page is rebuilt; editing them, also step by step with
- * `?setup=true`, still stands in for the current Web Client.
+ * (app.routes.ts): the settings, and the form that edits them, step by step with `?setup=true`.
  */
 export const ISSUANCE_CONFIG_ROUTES: Routes = [
   {
@@ -13,6 +12,6 @@ export const ISSUANCE_CONFIG_ROUTES: Routes = [
   {
     path: 'edit',
     title: 'Edit issuer settings',
-    loadComponent: () => import('../../shared/pages/pending-page').then((m) => m.PendingPage),
+    loadComponent: () => import('./pages/issuer-settings-form').then((m) => m.IssuerSettingsForm),
   },
 ];

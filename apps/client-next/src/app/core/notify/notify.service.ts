@@ -13,6 +13,8 @@ export interface NoticeOptions {
   action?: NoticeAction;
   /** A second line, for detail that does not fit the message. */
   description?: string;
+  /** Called once the notice is gone: closed, timed out or replaced. */
+  onDismiss?: () => void;
 }
 
 /** An open notice. */
@@ -56,12 +58,13 @@ export class NotifyService {
   private open(
     show: typeof toast.success,
     message: string,
-    { duration, action, description }: NoticeOptions
+    { duration, action, description, onDismiss }: NoticeOptions
   ): Notice {
     const id = show(message, {
       duration,
       description,
       action: action && { label: action.label, onClick: () => action.onClick() },
+      ...(onDismiss ? { onDismiss: () => onDismiss(), onAutoClose: () => onDismiss() } : {}),
     });
     return { dismiss: () => toast.dismiss(id) };
   }

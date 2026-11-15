@@ -1,0 +1,667 @@
+@if (session.isPending()) {
+<div role="status" aria-label="Loading the session" class="grid gap-6">
+  <hlm-skeleton class="h-10 w-72 rounded-lg" />
+  <hlm-skeleton class="h-40 rounded-2xl" />
+  <hlm-skeleton class="h-56 rounded-2xl" />
+</div>
+} @else if (session.isError()) {
+<section
+  class="bg-card grid justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  @if (notFound(session.error())) {
+  <h1 class="text-lg font-semibold">There is no session {{ id() }}</h1>
+  <p class="text-muted-foreground max-w-md text-sm">
+    It may have been deleted, or it expired and was cleaned up.
+  </p>
+  <a hlmBtn variant="outline" routerLink="/session-management">
+    <ng-icon name="lucideArrowLeft" aria-hidden="true" />
+    All sessions
+  </a>
+  } @else {
+  <h1 class="text-lg font-semibold">The session could not be loaded</h1>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(session.error()) }}</p>
+  <div class="flex flex-wrap justify-center gap-2">
+    <button hlmBtn variant="outline" type="button" (click)="session.refetch()">Retry</button>
+    <a hlmBtn variant="ghost" routerLink="/session-management">All sessions</a>
+  </div>
+  }
+</section>
+} @else if (current(); as s) {
+<app-page-header
+  [heading]="(presentation() ? 'Presentation' : 'Issuance') + ' session'"
+  [description]="
+    (configurationIds().length ? configurationIds().join(', ') + ' · ' : '') +
+    (s.reference ? 'Reference ' + s.reference + ' · ' : '') +
+    'Created ' +
+    dateTime(s.createdAt)
+  "
+>
+  @if (logsUrl(); as url) {
+  <a hlmBtn variant="outline" [href]="url" target="_blank" rel="noopener">
+    <ng-icon name="lucideFileText" aria-hidden="true" />
+    Logs
+  </a>
+  } @if (tracesUrl(); as url) {
+  <a hlmBtn variant="outline" [href]="url" target="_blank" rel="noopener">
+    <ng-icon name="lucideActivity" aria-hidden="true" />
+    Traces
+  </a>
+  } @if (canCancel()) {
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    class="hover:border-destructive/40 hover:text-destructive"
+    [attr.aria-disabled]="cancel.isPending() || null"
+    (click)="askCancel()"
+  >
+    <ng-icon name="lucideCircleSlash" aria-hidden="true" />
+    {{ presentation() ? 'Cancel request' : 'Cancel offer' }}
+  </button>
+  } @if (canRecreate()) {
+  <button hlmBtn type="button" (click)="recreate(s)">
+    <ng-icon name="lucideRotateCcw" aria-hidden="true" />
+    {{ presentation() ? 'Request again' : 'Offer again' }}
+  </button>
+  }
+</app-page-header>
+
+<h2 #heading tabindex="-1" class="sr-only">Session {{ s.id }}</h2>
+
+<div class="mb-6 flex flex-wrap items-center gap-3 text-sm">
+  <span
+    class="rounded-full px-2.5 py-1 text-xs font-medium"
+    [class]="
+      s.status === 'completed'
+        ? 'bg-success/12 text-success'
+        : s.status === 'failed'
+          ? 'bg-destructive/10 text-destructive'
+          : s.status === 'active' || s.status === 'fetched'
+            ? 'bg-primary/8 text-primary dark:bg-primary/15'
+            : 'bg-muted text-muted-foreground'
+    "
+    >{{ statusLabel(s.status) }}</span
+  >
+  @if (live()) {
+  <span class="text-muted-foreground inline-flex items-center gap-1.5 text-xs">
+    <ng-icon
+      name="lucideRefreshCw"
+      class="animate-spin [animation-duration:3s]"
+      aria-hidden="true"
+    />
+    Updates live
+  </span>
+  }
+</div>
+
+<div class="grid grid-cols-1 gap-6">
+  <div aria-live="polite">
+    @if (result(); as r) {
+    <section
+      class="rounded-2xl border px-5 py-4 sm:px-6"
+      [class]="
+        r.tone === 'success'
+          ? 'border-success/30 bg-success/5'
+          : r.tone === 'error'
+            ? 'border-destructive/30 bg-destructive/5'
+            : 'bg-card'
+      "
+      aria-labelledby="result-heading"
+    >
+      <div class="flex items-start gap-3">
+        <ng-icon
+          [name]="
+            r.tone === 'success' ? 'lucideCircleCheck' : r.tone === 'error' ? 'lucideCircleX' : 'lucideCircleSlash'
+          "
+          class="mt-0.5 shrink-0 text-xl"
+          [class.text-success]="r.tone === 'success'"
+          [class.text-destructive]="r.tone === 'error'"
+          [class.text-muted-foreground]="r.tone === 'neutral'"
+          aria-hidden="true"
+        />
+        <div class="min-w-0 text-sm">
+          <h2 id="result-heading" class="text-base font-semibold">{{ r.title }}</h2>
+          @if (r.message) {
+          <p class="text-muted-foreground mt-1">{{ r.message }}</p>
+          } @if (r.cancelReason) {
+          <p class="mt-1"><span class="font-medium">Reason:</span> {{ r.cancelReason }}</p>
+          } @if (r.walletDescription) {
+          <p class="mt-1 [overflow-wrap:anywhere]">
+            <span class="font-medium">The wallet says:</span> {{ r.walletDescription }}
+          </p>
+          } @if (r.code) {
+          <p class="mt-1">
+            Failure code: <code class="font-mono text-xs">{{ r.code }}</code>
+            <a
+              class="text-primary ms-2 font-medium hover:underline"
+              routerLink="/session-management"
+              [queryParams]="{ status: 'failed', failureCode: r.code }"
+              >Sessions with this failure</a
+            >
+          </p>
+          } @if (r.checkRequest) {
+          <p class="text-muted-foreground mt-2">
+            The wallet refused the request before sending a presentation. Check what the wallet
+            requires of the request, for example a registration certificate or a trusted access
+            certificate.
+          </p>
+          }
+        </div>
+      </div>
+      @if (showCredentialResults(r)) {
+      <ul class="mt-4 grid gap-2" aria-label="Results per credential">
+        @for (credential of r.credentials; track $index) {
+        <li class="bg-card flex items-start gap-3 rounded-xl border px-4 py-3">
+          <ng-icon
+            [name]="credential.verified ? 'lucideBadgeCheck' : 'lucideShieldAlert'"
+            class="mt-0.5 shrink-0 text-lg"
+            [class.text-success]="credential.verified"
+            [class.text-destructive]="!credential.verified"
+            aria-hidden="true"
+          />
+          <div class="min-w-0 text-sm">
+            <p class="font-medium">
+              {{ credential.id || 'Credential ' + ($index + 1) }}
+              <span class="sr-only">{{ credential.verified ? 'verified' : 'not verified' }}</span>
+              @if (credential.format || credential.docType) {
+              <span class="text-muted-foreground ms-1 text-xs font-normal"
+                >{{ credential.docType || credential.format }}</span
+              >
+              }
+            </p>
+            @if (credential.message || credential.error) {
+            <p class="text-muted-foreground mt-0.5 [overflow-wrap:anywhere]">
+              {{ credential.message || credential.error }}
+            </p>
+            } @for (warning of credential.warnings; track $index) {
+            <p class="text-warning mt-1 flex items-start gap-1.5">
+              <ng-icon name="lucideTriangleAlert" class="mt-0.5 shrink-0" aria-hidden="true" />
+              {{ warning.message || warning.code }}
+            </p>
+            }
+          </div>
+        </li>
+        }
+      </ul>
+      }
+    </section>
+    }
+  </div>
+
+  @if (s.status === 'fetched') {
+  <section class="bg-card flex items-start gap-3 rounded-2xl border px-5 py-4 text-sm sm:px-6">
+    <ng-icon
+      name="lucideHourglass"
+      class="text-muted-foreground mt-0.5 shrink-0 text-lg"
+      aria-hidden="true"
+    />
+    <div>
+      <h2 class="font-semibold">Waiting for the wallet</h2>
+      <p class="text-muted-foreground mt-1">
+        {{ presentation() ? 'A wallet fetched the request. Waiting for its answer.' : 'The
+        credentials were issued. Waiting for the wallet to confirm them.' }}
+      </p>
+    </div>
+  </section>
+  } @else if (!result()) { @if (canSeeOffer()) {
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="wallet-heading"
+  >
+    <h2 id="wallet-heading" class="font-semibold">
+      {{ presentation() ? 'Presentation request' : 'Credential offer' }}
+    </h2>
+    @if (s.useDcApi) {
+    <p class="text-muted-foreground mt-1 text-sm">
+      The request goes to a wallet on this device through the Digital Credentials API.
+    </p>
+    @if (dcApiAvailable) {
+    <button
+      hlmBtn
+      type="button"
+      class="mt-4"
+      [attr.aria-busy]="presenting() || null"
+      [attr.aria-disabled]="presenting() || null"
+      (click)="presentHere(s)"
+    >
+      @if (presenting()) {
+      <hlm-spinner class="size-4" />
+      } @else {
+      <ng-icon name="lucideSmartphone" aria-hidden="true" />
+      } Ask a wallet on this device
+    </button>
+    } @else {
+    <p class="text-muted-foreground mt-3 text-sm">
+      This browser offers no Digital Credentials API. Open the page in a browser that does.
+    </p>
+    } } @else if (link(); as url) {
+    <p class="text-muted-foreground mt-1 text-sm">
+      Scan the code with a wallet, or open the link on the device with the wallet.
+    </p>
+    <div class="mt-4 grid items-center gap-5 sm:grid-cols-[auto_1fr]">
+      @if (qr(); as image) {
+      <img
+        [src]="image"
+        [alt]="presentation() ? 'QR code of the request' : 'QR code of the offer'"
+        class="size-56 rounded-xl bg-white p-2 ring-1 ring-black/5"
+      />
+      } @else {
+      <hlm-skeleton class="size-56 rounded-xl" />
+      }
+      <div class="bg-muted/50 flex min-w-0 items-start gap-1 rounded-lg px-3 py-2">
+        <a class="min-w-0 flex-1 font-mono text-xs break-all hover:underline" [href]="url"
+          >{{ url }}</a
+        >
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          type="button"
+          [attr.aria-label]="presentation() ? 'Copy the request link' : 'Copy the offer link'"
+          [hlmTooltip]="presentation() ? 'Copy request link' : 'Copy offer link'"
+          (click)="copy(url, presentation() ? 'Request link' : 'Offer link')"
+        >
+          <ng-icon name="lucideCopy" />
+        </button>
+      </div>
+    </div>
+    } @else {
+    <p class="text-muted-foreground mt-2 text-sm">
+      No {{ presentation() ? 'request' : 'offer' }} link is available.
+    </p>
+    }
+  </section>
+  } @else {
+  <p class="text-muted-foreground text-sm">
+    The {{ presentation() ? 'request' : 'offer' }} link and its QR code are shown only with {{
+    presentation() ? 'presentation:request or presentation:manage' : 'issuance:offer or
+    issuance:manage' }}.
+  </p>
+  } } @if (presented().length) {
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="presented-heading"
+  >
+    <h2 id="presented-heading" class="font-semibold">Presented credentials</h2>
+    <div class="mt-4 grid gap-5">
+      @for (credential of presented(); track $index) {
+      <div>
+        <h3 class="text-sm font-medium">
+          {{ credential.queryId }} @if (credential.type || docTypeOf(s, credential.queryId); as
+          type) {
+          <span class="text-muted-foreground ms-1 font-mono text-xs font-normal">{{ type }}</span>
+          }
+        </h3>
+        @if (trustedIssuer(s, credential.queryId); as trusted) {
+        <p class="text-success mt-1 flex items-center gap-1.5 text-xs">
+          <ng-icon name="lucideBadgeCheck" aria-hidden="true" />
+          Trusted issuer: {{ trusted }}
+        </p>
+        } @else if (credential.issuer) {
+        <p class="text-muted-foreground mt-1 text-xs">Issuer: {{ credential.issuer }}</p>
+        } @if (credential.claims.length) {
+        <div class="mt-2 overflow-x-auto rounded-xl ring-1 ring-black/5 dark:ring-white/8">
+          <table class="w-full text-left text-sm">
+            <thead class="bg-muted/40 text-muted-foreground text-xs">
+              <tr>
+                <th scope="col" class="px-3 py-2 font-medium">Claim</th>
+                <th scope="col" class="px-3 py-2 font-medium">Value</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y">
+              @for (claim of credential.claims; track claim.path) {
+              <tr class="align-top">
+                <th scope="row" class="px-3 py-2 font-mono text-xs font-medium">
+                  {{ claim.path }}
+                </th>
+                <td class="px-3 py-2 [overflow-wrap:anywhere]">{{ claim.value }}</td>
+              </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        } @else {
+        <p class="text-muted-foreground mt-1 text-sm">No claims were disclosed.</p>
+        }
+      </div>
+      }
+    </div>
+  </section>
+  } @if (canReadStatus()) {
+  <app-credential-status-card
+    [sessionId]="s.id"
+    [sessionStatus]="s.status"
+    [canChange]="canChangeStatus()"
+  />
+  }
+
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="details-heading"
+  >
+    <h2 id="details-heading" class="font-semibold">Details</h2>
+    <dl class="mt-3 grid gap-x-8 text-sm md:grid-cols-2">
+      <div class="flex gap-3 border-b py-3">
+        <dt class="text-muted-foreground w-36 shrink-0">Session ID</dt>
+        <dd class="flex min-w-0 items-start gap-1">
+          <span class="font-mono text-[0.8rem] break-all">{{ s.id }}</span>
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground hover:bg-muted grid size-6 shrink-0 place-items-center rounded-md"
+            aria-label="Copy the session ID"
+            hlmTooltip="Copy session ID"
+            (click)="copy(s.id, 'Session ID')"
+          >
+            <ng-icon name="lucideCopy" class="text-[0.8rem]" />
+          </button>
+        </dd>
+      </div>
+      @for (configId of configurationIds(); track configId) {
+      <div class="flex gap-3 border-b py-3">
+        <dt class="text-muted-foreground w-36 shrink-0">
+          {{ presentation() ? 'Presentation configuration' : 'Credential type' }}
+        </dt>
+        <dd class="min-w-0 font-mono text-[0.8rem] break-all">
+          <a
+            class="hover:underline"
+            [routerLink]="presentation() ? ['/presentation-config', configId] : ['/credential-config', configId]"
+            >{{ configId }}</a
+          >
+        </dd>
+      </div>
+      } @if (s.reference) {
+      <div class="flex gap-3 border-b py-3">
+        <dt class="text-muted-foreground w-36 shrink-0">Reference</dt>
+        <dd class="min-w-0 break-all">{{ s.reference }}</dd>
+      </div>
+      }
+      <div class="flex gap-3 border-b py-3">
+        <dt class="text-muted-foreground w-36 shrink-0">Created</dt>
+        <dd>{{ dateTime(s.createdAt) }}</dd>
+      </div>
+      <div class="flex gap-3 border-b py-3">
+        <dt class="text-muted-foreground w-36 shrink-0">Last update</dt>
+        <dd>{{ dateTime(s.updatedAt) }}</dd>
+      </div>
+      @if (s.expiresAt) {
+      <div class="flex gap-3 border-b py-3">
+        <dt class="text-muted-foreground w-36 shrink-0">Valid until</dt>
+        <dd>{{ dateTime(s.expiresAt) }}</dd>
+      </div>
+      }
+      <div class="flex gap-3 border-b py-3">
+        <dt class="text-muted-foreground w-36 shrink-0">Delivery</dt>
+        <dd>{{ s.useDcApi ? 'Digital Credentials API' : 'QR code or link' }}</dd>
+      </div>
+      @if (s.authorization_code) {
+      <div class="flex gap-3 border-b py-3">
+        <dt class="text-muted-foreground w-36 shrink-0">Authorization code</dt>
+        <dd class="flex min-w-0 items-start gap-1">
+          <span class="font-mono text-[0.8rem] break-all">{{ s.authorization_code }}</span>
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground hover:bg-muted grid size-6 shrink-0 place-items-center rounded-md"
+            aria-label="Copy the authorization code"
+            hlmTooltip="Copy authorization code"
+            (click)="copy(s.authorization_code, 'Authorization code')"
+          >
+            <ng-icon name="lucideCopy" class="text-[0.8rem]" />
+          </button>
+        </dd>
+      </div>
+      } @if (s.request_uri) {
+      <div class="flex gap-3 border-b py-3">
+        <dt class="text-muted-foreground w-36 shrink-0">Request URI</dt>
+        <dd class="flex min-w-0 items-start gap-1">
+          <span class="font-mono text-[0.8rem] break-all">{{ s.request_uri }}</span>
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground hover:bg-muted grid size-6 shrink-0 place-items-center rounded-md"
+            aria-label="Copy the request URI"
+            hlmTooltip="Copy request URI"
+            (click)="copy(s.request_uri, 'Request URI')"
+          >
+            <ng-icon name="lucideCopy" class="text-[0.8rem]" />
+          </button>
+        </dd>
+      </div>
+      }
+    </dl>
+  </section>
+
+  <section aria-labelledby="technical-heading">
+    <h2 id="technical-heading" class="mb-2 font-semibold">Technical data</h2>
+    <hlm-tabs tab="raw">
+      <hlm-tabs-list
+        variant="line"
+        aria-label="Technical data"
+        class="h-11 w-full justify-start overflow-x-auto"
+      >
+        <button hlmTabsTrigger="raw" class="flex-none px-3">Session</button>
+        @if (s.credentials?.length) {
+        <button hlmTabsTrigger="credentials" class="flex-none px-3">
+          Credentials ({{ s.credentials.length }})
+        </button>
+        } @if (s.offer) {
+        <button hlmTabsTrigger="offer" class="flex-none px-3">Offer</button>
+        } @if (s.requestObject) {
+        <button hlmTabsTrigger="request" class="flex-none px-3">Presentation request</button>
+        } @if (s.credentialPayload) {
+        <button hlmTabsTrigger="payload" class="flex-none px-3">Offer request</button>
+        } @if (s.auth_queries) {
+        <button hlmTabsTrigger="auth" class="flex-none px-3">Authorization</button>
+        } @if (s.parsedWebhook || s.webhookEndpointId) {
+        <button hlmTabsTrigger="webhooks" class="flex-none px-3">Webhooks</button>
+        } @if (s.notifications.length) {
+        <button hlmTabsTrigger="notifications" class="flex-none px-3">
+          Notifications ({{ s.notifications.length }})
+        </button>
+        }
+        <button hlmTabsTrigger="logs" class="flex-none px-3">
+          Log ({{ logs.data()?.length ?? 0 }})
+        </button>
+      </hlm-tabs-list>
+
+      <ng-template #block let-value let-label="label">
+        <div class="bg-card relative rounded-xl ring-1 ring-black/5 dark:ring-white/8">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="icon-sm"
+            type="button"
+            class="absolute end-2 top-2"
+            [attr.aria-label]="'Copy ' + label"
+            hlmTooltip="Copy"
+            (click)="copy(value, label)"
+          >
+            <ng-icon name="lucideCopy" />
+          </button>
+          <pre class="max-h-[32rem] overflow-auto p-4 pe-12 font-mono text-xs leading-relaxed">
+{{ value }}</pre>
+        </div>
+      </ng-template>
+
+      <div hlmTabsContent="raw" class="pt-4">
+        <ng-container
+          *ngTemplateOutlet="block; context: { $implicit: json(s), label: 'Session' }"
+        />
+      </div>
+      @if (s.credentials?.length) {
+      <div hlmTabsContent="credentials" class="grid gap-3 pt-4">
+        @for (credential of s.credentials; track $index) {
+        <ng-container
+          *ngTemplateOutlet="block; context: { $implicit: json(credential), label: 'Credential ' + ($index + 1) }"
+        />
+        }
+      </div>
+      } @if (s.offer) {
+      <div hlmTabsContent="offer" class="pt-4">
+        <ng-container
+          *ngTemplateOutlet="block; context: { $implicit: json(s.offer), label: 'Offer' }"
+        />
+      </div>
+      } @if (s.requestObject) {
+      <div hlmTabsContent="request" class="pt-4">
+        <ng-container
+          *ngTemplateOutlet="block; context: { $implicit: requestPayload(s.requestObject), label: 'Presentation request' }"
+        />
+      </div>
+      } @if (s.credentialPayload) {
+      <div hlmTabsContent="payload" class="pt-4">
+        <ng-container
+          *ngTemplateOutlet="block; context: { $implicit: json(s.credentialPayload), label: 'Offer request' }"
+        />
+      </div>
+      } @if (s.auth_queries) {
+      <div hlmTabsContent="auth" class="pt-4">
+        <ng-container
+          *ngTemplateOutlet="block; context: { $implicit: json(s.auth_queries), label: 'Authorization queries' }"
+        />
+      </div>
+      } @if (s.parsedWebhook || s.webhookEndpointId) {
+      <div hlmTabsContent="webhooks" class="grid gap-3 pt-4">
+        @if (s.webhookEndpointId) {
+        <p class="text-sm">
+          Notifications go to the webhook endpoint
+          <a
+            class="font-mono hover:underline"
+            [routerLink]="['/webhook-endpoints', s.webhookEndpointId]"
+            >{{ s.webhookEndpointId }}</a
+          >.
+        </p>
+        } @if (s.parsedWebhook) {
+        <ng-container
+          *ngTemplateOutlet="block; context: { $implicit: json(s.parsedWebhook), label: 'Webhook' }"
+        />
+        }
+      </div>
+      } @if (s.notifications.length) {
+      <div hlmTabsContent="notifications" class="grid gap-3 pt-4">
+        @for (notification of s.notifications; track $index) {
+        <ng-container
+          *ngTemplateOutlet="block; context: { $implicit: json(notification), label: 'Notification ' + ($index + 1) }"
+        />
+        }
+      </div>
+      }
+      <div hlmTabsContent="logs" class="pt-4">
+        @if (!logs.data()?.length) {
+        <p class="text-muted-foreground text-sm">
+          No log entries. The instance keeps session logs only with LOG_SESSION_STORE on.
+        </p>
+        } @else {
+        <ol class="grid gap-2">
+          @for (entry of logs.data(); track entry.id) {
+          <li
+            class="bg-card rounded-xl border-s-4 px-4 py-3 ring-1 ring-black/5 dark:ring-white/8"
+            [class]="
+              entry.level === 'error'
+                ? 'border-s-destructive'
+                : entry.level === 'warn'
+                  ? 'border-s-warning'
+                  : 'border-s-primary/40'
+            "
+          >
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+              <span
+                class="rounded px-1.5 py-0.5 font-mono font-medium uppercase"
+                [class]="
+                  entry.level === 'error'
+                    ? 'bg-destructive/10 text-destructive'
+                    : entry.level === 'warn'
+                      ? 'bg-warning/12 text-warning'
+                      : 'bg-muted text-muted-foreground'
+                "
+                >{{ entry.level }}</span
+              >
+              @if (entry.stage) {
+              <span class="font-mono">{{ entry.stage }}</span>
+              }
+              <span class="text-muted-foreground">{{ dateTime(entry.timestamp) }}</span>
+              @if (traceOf(entry.detail); as trace) {
+              <a
+                class="text-primary ms-auto inline-flex items-center gap-1 font-medium hover:underline"
+                [href]="trace"
+                target="_blank"
+                rel="noopener"
+              >
+                <ng-icon name="lucideActivity" aria-hidden="true" />
+                Trace
+              </a>
+              }
+            </div>
+            <p class="mt-1.5 text-sm [overflow-wrap:anywhere]">{{ entry.message }}</p>
+            @if (entry.detail) {
+            <pre class="bg-muted/50 mt-2 max-h-64 overflow-auto rounded-lg p-3 font-mono text-xs">
+{{
+              json(entry.detail)
+            }}</pre>
+            }
+          </li>
+          }
+        </ol>
+        }
+      </div>
+    </hlm-tabs>
+  </section>
+</div>
+
+<hlm-alert-dialog
+  [state]="confirmingCancel() ? 'open' : 'closed'"
+  (stateChanged)="onCancelDialog($event)"
+>
+  <hlm-alert-dialog-content *hlmAlertDialogPortal="let ctx">
+    <hlm-alert-dialog-header>
+      <h2 hlmAlertDialogTitle>
+        {{ presentation() ? 'Cancel the request?' : 'Cancel the offer?' }}
+      </h2>
+      <p hlmAlertDialogDescription>
+        A wallet can no longer use it. An offer a wallet already redeemed cannot be cancelled, and
+        credentials already issued stay valid.
+      </p>
+    </hlm-alert-dialog-header>
+    <form class="space-y-2" (submit)="$event.preventDefault(); confirmCancel(s)">
+      <label for="detail-cancel-reason" class="text-sm font-medium">Reason (optional)</label>
+      <textarea
+        id="detail-cancel-reason"
+        hlmInput
+        class="w-full"
+        [formControl]="reason"
+        maxlength="500"
+        rows="3"
+        placeholder="For example: sent to the wrong person"
+      ></textarea>
+      <p class="text-muted-foreground text-xs">
+        Kept in the audit log and sent to the session's webhook. {{ reason.value.length }}/500
+      </p>
+      <hlm-alert-dialog-footer>
+        <button
+          hlmAlertDialogCancel
+          type="button"
+          [disabled]="cancel.isPending()"
+          (click)="confirmingCancel.set(false); ctx.close()"
+        >
+          Back
+        </button>
+        <button
+          hlmAlertDialogAction
+          variant="destructive"
+          type="submit"
+          [disabled]="cancel.isPending()"
+        >
+          @if (cancel.isPending()) {
+          <hlm-spinner class="size-4" aria-hidden="true" />
+          Cancelling… } @else { {{ presentation() ? 'Cancel request' : 'Cancel offer' }} }
+        </button>
+      </hlm-alert-dialog-footer>
+    </form>
+  </hlm-alert-dialog-content>
+</hlm-alert-dialog>
+}

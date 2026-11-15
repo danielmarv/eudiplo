@@ -274,6 +274,34 @@
     </header>
 
     <div class="mx-auto w-full max-w-[120rem] flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8 2xl:px-10">
+      @if (versionMismatch() && !versionWarningDismissed()) {
+      <div
+        class="border-warning/30 bg-warning/8 mb-6 flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm"
+        role="alert"
+      >
+        <ng-icon
+          name="lucideTriangleAlert"
+          class="text-warning mt-0.5 shrink-0"
+          aria-hidden="true"
+        />
+        <p class="flex-1">
+          This Web Client is version <span class="font-medium">{{ clientVersion }}</span>, the
+          backend <span class="font-medium">{{ version.data()?.version }}</span>. Some features may
+          not work; use the client image with the backend's tag.
+        </p>
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          type="button"
+          aria-label="Dismiss the version warning"
+          hlmTooltip="Dismiss"
+          (click)="versionWarningDismissed.set(true)"
+        >
+          <ng-icon name="lucideX" />
+        </button>
+      </div>
+      }
       <router-outlet />
     </div>
   </main>

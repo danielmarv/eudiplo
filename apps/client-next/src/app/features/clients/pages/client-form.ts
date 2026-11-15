@@ -17,7 +17,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import type { ClientEntity, TenantClientCredentialsDto } from '@eudiplo/sdk-core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
-import { lucideLock, lucideShieldAlert, lucideTriangleAlert } from '@ng-icons/lucide';
+import { lucideShieldAlert, lucideTriangleAlert } from '@ng-icons/lucide';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCheckboxImports } from '@spartan-ng/helm/checkbox';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
@@ -27,8 +27,7 @@ import { HlmSpinnerImports } from '@spartan-ng/helm/spinner';
 import { injectMutation, injectQuery, QueryClient } from '@tanstack/angular-query-experimental';
 import { map, merge, startWith } from 'rxjs';
 import { CallerService } from '../../../core/auth/caller.service';
-import { ROLE_DESCRIPTIONS, ROLE_GROUPS } from '../../../core/auth/role-descriptions';
-import { grantHint, type Role, roleChoices } from '../../../core/auth/role-grants';
+import { roleChoices } from '../../../core/auth/role-grants';
 import { SessionService } from '../../../core/auth/session.service';
 import { getApiErrorMessage, hasHttpStatus } from '../../../core/errors/error-message';
 import { NotifyService } from '../../../core/notify/notify.service';
@@ -40,6 +39,7 @@ import {
 import { OwnershipNotice } from '../../../shared/config-ownership/ownership-notice';
 import { firstFieldWithError, showFieldsToFix } from '../../../shared/forms/field-to-fix';
 import { PageHeader } from '../../../shared/pages/page-header';
+import { RoleChoices } from '../../../shared/roles/role-choices';
 import { credentialConfigsQuery } from '../../issuance/data/issuance-queries';
 import { presentationConfigsQuery } from '../../presentation-configs/data/presentation-config-queries';
 import { ClientSecretDialog } from '../../tenants/components/client-secret-dialog';
@@ -81,8 +81,9 @@ type SourceState = 'forbidden' | 'loading' | 'failed' | 'loaded';
     ClientSecretDialog,
     OwnershipNotice,
     PageHeader,
+    RoleChoices,
   ],
-  providers: [provideIcons({ lucideLock, lucideShieldAlert, lucideTriangleAlert })],
+  providers: [provideIcons({ lucideShieldAlert, lucideTriangleAlert })],
   templateUrl: './client-form.html',
 })
 export class ClientForm {
@@ -93,7 +94,7 @@ export class ClientForm {
   private readonly instance = this.session.getBaseUrl();
   private readonly caller = inject(CallerService).loadedCaller;
   private readonly tenant = computed(() => this.caller()?.tenantId);
-  private readonly callerRoles = computed(() => this.caller()?.roles ?? []);
+  protected readonly callerRoles = computed(() => this.caller()?.roles ?? []);
   private readonly router = inject(Router);
   private readonly notify = inject(NotifyService);
   private readonly queryClient = inject(QueryClient);
@@ -158,18 +159,6 @@ export class ClientForm {
       : '';
   });
 
-  /** The roles to choose from by group: those the caller may grant, and the client's others. */
-  protected readonly roleGroups = computed(() => {
-    const options = roleChoices(this.callerRoles(), this.client.data()?.roles ?? []).options;
-    const byRole = new Map(options.map((option) => [option.role, option.locked]));
-    return ROLE_GROUPS.map((group) => ({
-      label: group.label,
-      roles: group.roles
-        .filter((role) => byRole.has(role))
-        .map((role) => ({ role, locked: byRole.get(role)! })),
-    })).filter((group) => group.roles.length);
-  });
-  protected readonly grantHint = computed(() => grantHint(this.callerRoles()));
   protected readonly selectedRoles = computed(() => this.value().roles);
 
   protected readonly sources: ConfigSource[] = ['presentation', 'issuance'];
@@ -272,15 +261,12 @@ export class ClientForm {
 
   // ---- Roles ----
 
-  protected toggleRole(role: Role, checked: boolean): void {
+  protected setRoles(roles: string[]): void {
     const control = this.form.controls.roles;
-    const rest = control.value.filter((value) => value !== role);
     control.markAsDirty();
     control.markAsTouched();
-    control.setValue(checked ? [...rest, role] : rest);
+    control.setValue(roles);
   }
-
-  protected readonly descriptions = ROLE_DESCRIPTIONS;
 
   // ---- Save ----
 

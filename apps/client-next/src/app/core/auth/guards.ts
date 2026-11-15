@@ -1,5 +1,10 @@
 import { inject } from '@angular/core';
-import { type CanActivateFn, Router } from '@angular/router';
+import {
+  type ActivatedRouteSnapshot,
+  type CanActivateFn,
+  type Route,
+  Router,
+} from '@angular/router';
 import { NotifyService } from '../notify/notify.service';
 import { CallerService } from './caller.service';
 import type { Role } from './role-grants';
@@ -26,13 +31,32 @@ export const authGuard: CanActivateFn = async (_route, state) => {
   });
 };
 
+/** The roles each route asked for when it was last opened, for `rolesOfPage`. */
+const ROUTE_ROLES = new WeakMap<Route, Role[]>();
+
+/**
+ * The role sets the open page and the routes above it need, one of each set: what
+ * `requireRole` checked when they were opened. Empty for a page open to every caller.
+ */
+export function rolesOfPage(router: Router): Role[][] {
+  const required: Role[][] = [];
+  let route: ActivatedRouteSnapshot | null = router.routerState.snapshot.root;
+  while (route) {
+    const roles = route.routeConfig ? ROUTE_ROLES.get(route.routeConfig) : undefined;
+    if (roles) required.push(roles);
+    route = route.firstChild;
+  }
+  return required;
+}
+
 /**
  * Opens a page only for a caller with one of `roles`, as the backend resolved them from the
  * token. Without a caller, loading it failed and a notice offers to try again and open the
  * page, so the user stays where they are; a caller without the roles goes to the dashboard.
  */
 export function requireRole(...roles: Role[]): CanActivateFn {
-  return async (_route, state) => {
+  return async (route, state) => {
+    if (route.routeConfig) ROUTE_ROLES.set(route.routeConfig, roles);
     const callers = inject(CallerService);
     const router = inject(Router);
     const notify = inject(NotifyService);

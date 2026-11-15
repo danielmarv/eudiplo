@@ -31,12 +31,12 @@ export const schemasKey = (instance: Instance, tenant: Tenant) =>
   ['schemas', instance, tenant] as const;
 
 /** Every version this tenant published (`GET /api/schema-metadata/mine`). */
-export function mySchemasQuery(instance: Instance, tenant: Tenant) {
+export function mySchemasQuery(instance: Instance, tenant: Tenant, enabled = true) {
   return queryOptions({
     queryKey: schemasKey(instance, tenant),
     queryFn: async (): Promise<SchemaEntry[]> =>
       (await schemaMetadataControllerGetMine()).data ?? [],
-    enabled: !!instance,
+    enabled: !!instance && enabled,
   });
 }
 

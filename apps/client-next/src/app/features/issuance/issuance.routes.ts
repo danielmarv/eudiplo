@@ -11,4 +11,6 @@ export const ISSUANCE_OFFER_ROUTES: Routes = [
     providers: [provideSchemaForms()],
     loadComponent: () => import('./pages/issuance-offer').then((m) => m.IssuanceOffer),
   },
+  // Links of the current Web Client may carry an ID; the page does not use it.
+  { path: ':id', redirectTo: '' },
 ];

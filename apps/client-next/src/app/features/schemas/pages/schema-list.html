@@ -53,7 +53,22 @@
     }
   </div>
 
-  @if (schemas.isPending()) {
+  @if (notConfigured()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <span
+      class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucidePlugZap" class="text-xl" />
+    </span>
+    <p class="font-semibold">Connect a registrar first</p>
+    <p class="text-muted-foreground max-w-md text-sm">
+      Schemas are published to the registrar's catalog. Configure the registrar of your wallet
+      ecosystem, then publish the schemas of your credential types here.
+    </p>
+    <a hlmBtn routerLink="/registrar">Configure the registrar</a>
+  </div>
+  } @else if (schemas.isPending()) {
   <div class="grid gap-3 p-5" aria-label="Loading schemas" role="status">
     @for (row of [1, 2, 3]; track row) {
     <hlm-skeleton class="h-14 w-full rounded-xl" />

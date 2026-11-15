@@ -44,7 +44,7 @@ apps/client-next/
         │   ├── dialogs/     # confirmation dialog (ConfirmService)
         │   ├── format/      # durations, dates, relative times, JWT parts
         │   ├── forms/       # field-to-fix, focus helpers, controls of default-able settings
-        │   ├── pages/       # page header, placeholder page
+        │   ├── pages/       # page header
         │   ├── sessions/    # what a session holds, such as the claims a wallet presented
         │   └── testing/     # helpers for specs
         └── features/        # one folder per feature
@@ -60,7 +60,7 @@ features/<feature>/
 └── components/              # presentational components: inputs in, outputs out
 ```
 
-To move a feature from `apps/client`, replace its `pending(...)` route in `app.routes.ts` with the feature's routes, keep the roles of its guard, and bring its specs along.
+Every page of `apps/client` has a rebuilt counterpart; a new feature adds its routes to `app.routes.ts` behind the roles of its guard.
 
 ## Conventions
 
@@ -98,4 +98,8 @@ The administration pages for API clients and the activity log are rebuilt: `/cli
 
 Config portability is rebuilt at `/settings/config-portability`: export as archive or editable JSON, import of an archive, a bundle or a single document after a read-only plan (with field changes, removals and deletions confirmed), resource ownership with detach, bulk detach, apply from file and reset to file, generated client secrets shown until dismissed, and the latest configuration operations.
 
-Not carried over yet: the reaction to refused requests and expiring tokens (`ApiRefusalService` is here, but not started), the version check, and the Playwright tests.
+The remaining pages are rebuilt as well: people at `/users` (list, details, add with a temporary password shown once, edit roles and sign-in, delete), a session's details at `/session-management/:id` (result, offer or request with QR code and Digital Credentials API, presented credentials, credential status with suspend, revoke and reinstate, cancellation, technical data and log, Grafana links), a credential type's details and its editor at `/credential-config/:id`, `/credential-config/create` and `/credential-config/:id/edit` (guided or all steps, templates, claims with constraints checked as on save, appearance, settings, JSON), and the issuer settings editor at `/issuance-config/edit` (identity, authorization servers, trust lists, federation, registration certificate, JSON). The tenant details replace a client's secret.
+
+The shell warns before a token that cannot be renewed expires, says when the session expired, the API client lost its access or the backend does not answer, names roles a new token lost, and shows a banner when the backend version differs from the client's.
+
+Not carried over yet: the Playwright tests. The JSON views are text fields rather than Monaco editors, and authorization servers are reordered with buttons rather than drag and drop.

@@ -1,11 +1,8 @@
 import type { Routes } from '@angular/router';
 
-const pendingPage = () => import('../../shared/pages/pending-page').then((m) => m.PendingPage);
-
 /**
  * The credential type pages, under `/credential-config` and behind `issuance:manage`
- * (app.routes.ts). The list is rebuilt; creating, showing and editing one still stand in for the
- * current Web Client.
+ * (app.routes.ts): the list, a credential type's details, and the form that adds or edits one.
  */
 export const CREDENTIAL_CONFIG_ROUTES: Routes = [
   {
@@ -13,7 +10,22 @@ export const CREDENTIAL_CONFIG_ROUTES: Routes = [
     loadComponent: () =>
       import('./pages/credential-config-list').then((m) => m.CredentialConfigList),
   },
-  { path: 'create', title: 'New credential type', loadComponent: pendingPage },
-  { path: ':id', title: 'Credential type', loadComponent: pendingPage },
-  { path: ':id/edit', title: 'Edit credential type', loadComponent: pendingPage },
+  {
+    path: 'create',
+    title: 'New credential type',
+    loadComponent: () =>
+      import('./pages/credential-config-form').then((m) => m.CredentialConfigForm),
+  },
+  {
+    path: ':id',
+    title: 'Credential type',
+    loadComponent: () =>
+      import('./pages/credential-config-detail').then((m) => m.CredentialConfigDetail),
+  },
+  {
+    path: ':id/edit',
+    title: 'Edit credential type',
+    loadComponent: () =>
+      import('./pages/credential-config-form').then((m) => m.CredentialConfigForm),
+  },
 ];

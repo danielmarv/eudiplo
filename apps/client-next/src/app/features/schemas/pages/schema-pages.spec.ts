@@ -45,6 +45,7 @@ const entry = (version: string, extra: Record<string, unknown> = {}) => ({
 
 describe('schema pages', () => {
   let schemas: Record<string, unknown>[] | 'fail';
+  let registrarConfigured: boolean;
   let configs: Record<string, unknown>[];
   let requests: { method: string; path: string; body?: unknown }[];
   let notify: Record<'success' | 'info' | 'warning' | 'error', ReturnType<typeof vi.fn>>;
@@ -94,6 +95,7 @@ describe('schema pages', () => {
 
   beforeEach(() => {
     schemas = [entry('1.0.0'), entry('1.1.0')];
+    registrarConfigured = true;
     configs = [
       {
         id: 'gym-card',
@@ -125,6 +127,11 @@ describe('schema pages', () => {
           : undefined;
         requests.push({ method: call.method, path, body });
         const all = schemas === 'fail' ? [] : schemas;
+        if (path === '/api/registrar/config') {
+          return registrarConfigured
+            ? json({ registrarUrl: 'https://registrar.example' })
+            : json({ statusCode: 404, message: 'No registrar configuration found' }, 404);
+        }
         if (path === '/api/schema-metadata/mine') {
           return schemas === 'fail' ? json({ message: 'Registrar unreachable' }, 502) : json(all);
         }
@@ -202,6 +209,14 @@ describe('schema pages', () => {
         button('Publish schema')!,
         'Publishing a schema needs the issuance:manage role.'
       );
+    });
+
+    it('asks to connect a registrar first when none is configured', async () => {
+      registrarConfigured = false;
+      const { settle } = await render(SchemaList);
+      await settle(() => expect(text()).toContain('Connect a registrar first'));
+      expect(page().querySelector('a[href="/registrar"]')).not.toBeNull();
+      expect(requests.some((request) => request.path === '/api/schema-metadata/mine')).toBe(false);
     });
 
     it('points to the registrar configuration when the schemas cannot be loaded', async () => {

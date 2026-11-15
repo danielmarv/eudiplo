@@ -225,6 +225,11 @@
             >
               <app-sort-toggle [column]="column('roles')">Roles</app-sort-toggle>
             </th>
+            @if (!providerManagesClients()) {
+            <th hlmTh scope="col" class="w-16 pe-4 sm:pe-5">
+              <span class="sr-only">Actions</span>
+            </th>
+            }
           </tr>
         </thead>
         <tbody hlmTBody>
@@ -258,6 +263,43 @@
                 }
               </ul>
             </td>
+            @if (!providerManagesClients()) { @let lock = secretLock(client);
+            <td hlmTd class="py-3 pe-4 align-top sm:pe-5">
+              <div class="flex justify-end">
+                @if (lock) {
+                <span [id]="'secret-lock-' + client.clientId" class="sr-only">{{ lock }}</span>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-sm"
+                  type="button"
+                  class="text-muted-foreground cursor-not-allowed opacity-50"
+                  aria-disabled="true"
+                  [attr.aria-describedby]="'secret-lock-' + client.clientId"
+                  [attr.aria-label]="'Replace the secret of ' + client.clientId"
+                  [hlmTooltip]="lock"
+                >
+                  <ng-icon name="lucideKeyRound" />
+                </button>
+                } @else {
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-sm"
+                  type="button"
+                  class="text-muted-foreground"
+                  [attr.aria-label]="'Replace the secret of ' + client.clientId"
+                  [attr.aria-busy]="clientActions.busy() === client.clientId || null"
+                  [attr.aria-disabled]="clientActions.busy() === client.clientId || null"
+                  hlmTooltip="Replace secret"
+                  (click)="clientActions.rotateSecret(client)"
+                >
+                  <ng-icon name="lucideKeyRound" />
+                </button>
+                }
+              </div>
+            </td>
+            }
           </tr>
           }
         </tbody>
@@ -303,3 +345,8 @@
   (deleted)="onDeleted($event)"
 />
 }
+
+<app-client-secret-dialog
+  [credentials]="clientActions.secret()"
+  (closed)="clientActions.secret.set(null)"
+/>

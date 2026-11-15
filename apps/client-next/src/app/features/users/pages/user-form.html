@@ -1,0 +1,120 @@
+<app-page-header
+  [heading]="editing() ? 'Edit ' + (user.data()?.username ?? 'person') : 'Add person'"
+  [description]="
+    editing()
+      ? 'Change whether they can sign in and what they may do.'
+      : 'The identity provider creates the account with a temporary password, which they change at the first sign-in.'
+  "
+/>
+
+@if (editing() && user.isPending()) {
+<div role="status" aria-label="Loading the person" class="grid max-w-4xl gap-6">
+  <hlm-skeleton class="h-40 w-full rounded-2xl" />
+  <hlm-skeleton class="h-80 w-full rounded-2xl" />
+</div>
+} @else if (editing() && user.isError()) {
+<section
+  class="bg-card grid max-w-4xl justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  <p class="font-semibold">The person could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(user.error()) }}</p>
+  <div class="flex flex-wrap justify-center gap-2">
+    <button hlmBtn variant="outline" type="button" (click)="user.refetch()">Retry</button>
+    <a hlmBtn variant="ghost" routerLink="/users">All people</a>
+  </div>
+</section>
+} @else { @if (unmanageable().length) {
+<div
+  class="border-warning/30 bg-warning/8 mb-6 flex max-w-4xl items-start gap-3 rounded-2xl border px-4 py-3 text-sm"
+  role="note"
+>
+  <ng-icon name="lucideShieldAlert" class="text-warning mt-0.5 shrink-0" aria-hidden="true" />
+  <p>
+    You cannot change this person: they have {{ unmanageable().length === 1 ? 'the role' : 'the
+    roles' }}
+    <span class="font-mono">{{ unmanageable().join(', ') }}</span>, which you neither hold nor may
+    grant.
+  </p>
+</div>
+}
+<form #formElement class="grid max-w-4xl gap-6" [formGroup]="form" (ngSubmit)="save()" novalidate>
+  <fieldset [disabled]="!!locked()" class="grid gap-6 disabled:opacity-70">
+    <legend class="sr-only">Person</legend>
+    <section
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+      aria-labelledby="account-heading"
+    >
+      <h2 id="account-heading" class="font-semibold">Account</h2>
+      <div class="mt-5 grid gap-5">
+        <hlm-field class="max-w-md content-start gap-2">
+          <label hlmFieldLabel for="user-name">Username</label>
+          <input
+            hlmInput
+            id="user-name"
+            class="h-10"
+            formControlName="username"
+            placeholder="jane.doe"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          @if (editing()) {
+          <p hlmFieldDescription>The username cannot change.</p>
+          }
+          <hlm-field-error validator="required">Enter the username.</hlm-field-error>
+        </hlm-field>
+        <label class="flex cursor-pointer items-start gap-3 text-sm" for="user-enabled">
+          <hlm-checkbox class="mt-0.5" inputId="user-enabled" formControlName="enabled" />
+          <span>
+            Can sign in
+            <span class="text-muted-foreground block text-xs"
+              >A disabled account keeps its roles but cannot sign in.</span
+            >
+          </span>
+        </label>
+      </div>
+    </section>
+
+    <section
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    >
+      <app-role-choices
+        [callerRoles]="callerRoles()"
+        [storedRoles]="user.data()?.roles ?? []"
+        [selected]="selectedRoles()"
+        [disabled]="!!locked()"
+        [invalid]="form.controls.roles.invalid && form.controls.roles.touched"
+        (selectedChange)="setRoles($event)"
+      />
+    </section>
+  </fieldset>
+
+  <div class="flex flex-wrap items-center justify-end gap-3">
+    @if (locked()) {
+    <p id="save-locked" class="text-muted-foreground me-auto text-sm">{{ locked() }}</p>
+    }
+    <a hlmBtn variant="ghost" [routerLink]="editing() ? ['/users', id()] : '/users'">Cancel</a>
+    <button
+      hlmBtn
+      type="submit"
+      [class.cursor-not-allowed]="!!locked()"
+      [class.opacity-50]="!!locked()"
+      [attr.aria-disabled]="saving() || !!locked() || null"
+      [attr.aria-busy]="saving() || null"
+      [attr.aria-describedby]="locked() ? 'save-locked' : null"
+    >
+      @if (saving()) {
+      <hlm-spinner class="size-4" />
+      Saving… } @else { {{ editing() ? 'Save person' : 'Add person' }} }
+    </button>
+  </div>
+</form>
+}
+
+<app-temporary-password-dialog [login]="created()" (closed)="onPasswordSaved()" />

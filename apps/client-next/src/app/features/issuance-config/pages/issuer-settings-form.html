@@ -1,0 +1,1277 @@
+<app-ownership-notice class="mb-6 block empty:hidden" kind="IssuanceConfig" [resource]="owner()" />
+
+<app-page-header
+  heading="Edit issuer settings"
+  description="Who issues, how wallets get access and what the issuer trusts."
+>
+  <a
+    hlmBtn
+    variant="ghost"
+    href="https://docs.eudiplo.dev/issuance/issuer-configuration"
+    target="_blank"
+    rel="noopener"
+  >
+    <ng-icon name="lucideExternalLink" aria-hidden="true" />
+    Documentation
+  </a>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    [attr.aria-disabled]="!stored.isSuccess() || saving() || null"
+    (click)="!stored.isSuccess() || saving() || openJson()"
+  >
+    <ng-icon name="lucideBraces" aria-hidden="true" />
+    Edit as JSON
+  </button>
+</app-page-header>
+
+@if (stored.isPending()) {
+<div role="status" aria-label="Loading the issuer settings" class="grid max-w-5xl gap-6">
+  <hlm-skeleton class="h-12 w-full rounded-xl" />
+  <hlm-skeleton class="h-96 w-full rounded-2xl" />
+</div>
+} @else if (stored.isError()) {
+<section
+  class="bg-card grid max-w-5xl justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+  role="alert"
+>
+  <span
+    class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideTriangleAlert" class="text-xl" />
+  </span>
+  <p class="font-semibold">The issuer settings could not be loaded</p>
+  <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(stored.error()) }}</p>
+  <p class="text-muted-foreground max-w-md text-sm">
+    They can only be edited once they are loaded.
+  </p>
+  <div class="flex flex-wrap justify-center gap-2">
+    <button hlmBtn variant="outline" type="button" (click)="stored.refetch()">Retry</button>
+    <a hlmBtn variant="ghost" routerLink="/issuance-config">Issuer settings</a>
+  </div>
+</section>
+} @else {
+<div class="grid max-w-5xl gap-5">
+  <div
+    class="bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm"
+  >
+    <p>
+      @if (guided()) {
+      <span class="font-medium">Step by step.</span> Name the issuer, choose how wallets get access,
+      then check what it trusts. } @else { <span class="font-medium">All steps.</span> Open any step
+      in any order. }
+    </p>
+    <button hlmBtn variant="ghost" size="sm" type="button" (click)="toggleGuided()">
+      {{ guided() ? 'Show all steps' : 'Set up step by step' }}
+    </button>
+  </div>
+
+  <nav aria-label="Steps">
+    <ol class="flex flex-wrap gap-1.5">
+      @for (name of steps; track name; let index = $index) { @let reachable = !guided() || index <=
+      furthest();
+      <li>
+        <button
+          type="button"
+          class="flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors"
+          [class]="step() === index ? 'border-primary bg-primary text-primary-foreground' : reachable ? 'hover:bg-muted' : 'text-muted-foreground cursor-not-allowed opacity-60'"
+          [attr.aria-current]="step() === index ? 'step' : null"
+          [attr.aria-disabled]="!reachable || null"
+          (click)="goTo(index)"
+        >
+          <span class="tabular-nums opacity-70">{{ index + 1 }}</span>
+          {{ name }}
+        </button>
+      </li>
+      }
+    </ol>
+  </nav>
+
+  @if (stepError()) {
+  <p class="text-destructive text-sm" role="alert">{{ stepError() }}</p>
+  }
+
+  <form #formElement class="grid gap-6" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <fieldset [disabled]="!!locked()" class="grid gap-6 disabled:opacity-70">
+      <legend class="sr-only">Issuer settings</legend>
+      @switch (step()) { @case (0) {
+      <section
+        class="bg-card rounded-2xl p-5 ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="identity-heading"
+      >
+        <h2 id="identity-heading" class="font-semibold">Issuer identity</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          The name and logo wallets show for the issuer, per language.
+        </p>
+        <div formArrayName="displays" class="mt-4 grid gap-4">
+          @for (display of form.controls.displays.controls; track display; let i = $index) {
+          <div class="rounded-xl border p-4" [formGroupName]="i">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-sm font-semibold">Language {{ i + 1 }}</h3>
+              @if (form.controls.displays.length > 1) {
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                class="text-muted-foreground hover:text-destructive"
+                [attr.aria-label]="'Remove language ' + (i + 1)"
+                hlmTooltip="Remove"
+                (click)="removeDisplay(i)"
+              >
+                <ng-icon name="lucideTrash2" />
+              </button>
+              }
+            </div>
+            <div class="mt-3 grid gap-x-5 gap-y-4 md:grid-cols-2">
+              <hlm-field class="content-start gap-2">
+                <label hlmFieldLabel [for]="'issuer-name-' + i">Name</label>
+                <input
+                  hlmInput
+                  [id]="'issuer-name-' + i"
+                  class="h-10"
+                  formControlName="name"
+                  placeholder="Acme Sports Club"
+                />
+                <hlm-field-error validator="required">Enter the issuer name.</hlm-field-error>
+              </hlm-field>
+              <hlm-field class="content-start gap-2">
+                <label hlmFieldLabel [for]="'issuer-locale-' + i">Language</label>
+                <hlm-native-select
+                  class="w-full"
+                  selectClass="h-10"
+                  [selectId]="'issuer-locale-' + i"
+                  formControlName="locale"
+                >
+                  @if (!knownLocale(display.controls.locale.value)) {
+                  <option [value]="display.controls.locale.value" selected>
+                    {{ display.controls.locale.value || 'Choose…' }}
+                  </option>
+                  } @for (locale of locales; track locale.value) {
+                  <option
+                    [value]="locale.value"
+                    [selected]="display.controls.locale.value === locale.value"
+                  >
+                    {{ locale.label }}
+                  </option>
+                  }
+                </hlm-native-select>
+                @if (display.controls.locale.errors?.['duplicateLocale']; as duplicate) {
+                <p class="text-destructive text-sm">
+                  Language {{ duplicate.firstIndex + 1 }} uses it already.
+                </p>
+                }
+              </hlm-field>
+              <app-image-field
+                class="md:col-span-2"
+                [control]="display.controls.logo"
+                label="Logo"
+                [inputId]="'issuer-logo-' + i"
+              />
+            </div>
+          </div>
+          }
+        </div>
+        <button hlmBtn variant="outline" type="button" class="mt-4" (click)="addDisplay()">
+          <ng-icon name="lucidePlus" aria-hidden="true" />
+          Add language
+        </button>
+      </section>
+      } @case (1) {
+      <p class="text-muted-foreground text-sm">
+        Choose how people authorize issuance. The built-in server handles pre-authorized offers; a
+        hosted presentation, an upstream login or an external server fit other cases. The first
+        enabled server is the preferred one.
+      </p>
+      <section
+        class="bg-card rounded-2xl p-5 ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="servers-heading"
+      >
+        <h2 id="servers-heading" class="font-semibold">Authorization servers</h2>
+        <div formArrayName="servers" class="mt-4 grid gap-3">
+          @for (server of servers.controls; track server; let i = $index) { @let open =
+          openServers().has(server); @let type = server.controls.type.value;
+          <div class="rounded-xl border" [formGroupName]="i">
+            <div class="flex items-center gap-2 px-4 py-3">
+              <button
+                type="button"
+                class="flex min-w-0 flex-1 items-center gap-3 text-start"
+                [attr.aria-expanded]="open"
+                (click)="toggleServer(server)"
+              >
+                <ng-icon
+                  name="lucideChevronDown"
+                  class="text-muted-foreground shrink-0 transition-transform"
+                  [class.rotate-180]="open"
+                  aria-hidden="true"
+                />
+                <span class="min-w-0">
+                  <span class="block truncate font-medium"
+                    >{{ server.controls.label.value || server.controls.id.value || 'New server'
+                    }}</span
+                  >
+                  <span class="text-muted-foreground block truncate text-xs">
+                    {{ type }} ·
+                    <span class="font-mono">{{ server.controls.id.value || 'no ID' }}</span>
+                    @if (type !== 'external' && !server.controls.enabled.value) { · disabled } @if
+                    (i === 0) { · preferred }
+                  </span>
+                </span>
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                [attr.aria-label]="'Move server ' + (i + 1) + ' up'"
+                [attr.aria-disabled]="i === 0 || null"
+                hlmTooltip="Move up"
+                (click)="moveServer(i, -1)"
+              >
+                <ng-icon name="lucideArrowUp" />
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                [attr.aria-label]="'Move server ' + (i + 1) + ' down'"
+                [attr.aria-disabled]="i === servers.length - 1 || null"
+                hlmTooltip="Move down"
+                (click)="moveServer(i, 1)"
+              >
+                <ng-icon name="lucideArrowDown" />
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                class="hover:text-destructive"
+                [attr.aria-label]="'Remove server ' + (i + 1)"
+                hlmTooltip="Remove"
+                (click)="removeServer(i)"
+              >
+                <ng-icon name="lucideTrash2" />
+              </button>
+            </div>
+            @if (open) {
+            <div class="grid gap-5 border-t px-4 py-4">
+              <div class="grid gap-x-5 gap-y-4 md:grid-cols-3">
+                <hlm-field class="content-start gap-2">
+                  <label hlmFieldLabel [for]="'server-type-' + i">Type</label>
+                  <hlm-native-select
+                    class="w-full"
+                    selectClass="h-10"
+                    [selectId]="'server-type-' + i"
+                    [value]="type"
+                    (valueChange)="setServerType(server, $any($event))"
+                  >
+                    @for (option of serverTypes; track option.value) {
+                    <option
+                      [value]="option.value"
+                      [selected]="type === option.value"
+                      [disabled]="option.value === 'built-in' && type !== 'built-in' && hasOtherBuiltIn(server)"
+                    >
+                      {{ option.label }}
+                    </option>
+                    }
+                  </hlm-native-select>
+                </hlm-field>
+                <hlm-field class="content-start gap-2">
+                  <label hlmFieldLabel [for]="'server-id-' + i">ID</label>
+                  <input
+                    hlmInput
+                    [id]="'server-id-' + i"
+                    class="h-10 font-mono text-sm"
+                    formControlName="id"
+                    spellcheck="false"
+                  />
+                  <hlm-field-error validator="required">Enter an ID.</hlm-field-error>
+                </hlm-field>
+                <hlm-field class="content-start gap-2">
+                  <label hlmFieldLabel [for]="'server-label-' + i">Label</label>
+                  <input hlmInput [id]="'server-label-' + i" class="h-10" formControlName="label" />
+                </hlm-field>
+              </div>
+
+              @if (type === 'external') {
+              <hlm-field class="content-start gap-2">
+                <label hlmFieldLabel [for]="'server-issuer-' + i">Authorization server URL</label>
+                <input
+                  hlmInput
+                  [id]="'server-issuer-' + i"
+                  class="h-10 font-mono text-sm"
+                  type="url"
+                  formControlName="issuer"
+                  placeholder="https://auth.example.com"
+                  spellcheck="false"
+                />
+              </hlm-field>
+              } @else {
+              <div class="flex flex-wrap gap-6 text-sm">
+                <label
+                  class="flex cursor-pointer items-center gap-2.5"
+                  [for]="'server-enabled-' + i"
+                  ><hlm-switch [inputId]="'server-enabled-' + i" formControlName="enabled" />
+                  Enabled</label
+                >
+                <label class="flex cursor-pointer items-center gap-2.5" [for]="'server-dpop-' + i"
+                  ><hlm-switch [inputId]="'server-dpop-' + i" formControlName="requireDPoP" />
+                  Require DPoP</label
+                >
+              </div>
+
+              @if (type === 'oid4vp') {
+              <div class="grid gap-x-5 gap-y-4 md:grid-cols-2">
+                <hlm-field class="content-start gap-2">
+                  <label hlmFieldLabel [for]="'server-pc-' + i">Presentation configuration</label>
+                  <hlm-native-select
+                    class="w-full"
+                    selectClass="h-10"
+                    [selectId]="'server-pc-' + i"
+                    formControlName="presentationConfigId"
+                  >
+                    <option
+                      value=""
+                      disabled
+                      [selected]="!server.controls.presentationConfigId.value"
+                    >
+                      Choose…
+                    </option>
+                    @for (config of presentationConfigs.data() ?? []; track config.id) {
+                    <option
+                      [value]="config.id"
+                      [selected]="server.controls.presentationConfigId.value === config.id"
+                    >
+                      {{ config.id }}
+                    </option>
+                    }
+                  </hlm-native-select>
+                  <p hlmFieldDescription>What the user presents to get the credential.</p>
+                </hlm-field>
+                <label
+                  class="flex cursor-pointer items-center gap-2.5 self-center text-sm"
+                  [for]="'server-redirect-' + i"
+                  ><hlm-switch
+                    [inputId]="'server-redirect-' + i"
+                    formControlName="immediateWalletRedirect"
+                  />
+                  Redirect to the wallet at once</label
+                >
+              </div>
+              } @if (type === 'chained') {
+              <div class="grid gap-x-5 gap-y-4 md:grid-cols-2">
+                <hlm-field class="content-start gap-2 md:col-span-2">
+                  <label hlmFieldLabel [for]="'server-upstream-' + i">OpenID provider URL</label>
+                  <input
+                    hlmInput
+                    [id]="'server-upstream-' + i"
+                    class="h-10 font-mono text-sm"
+                    type="url"
+                    formControlName="upstreamIssuer"
+                    placeholder="https://keycloak.example.com/realms/my-realm"
+                    spellcheck="false"
+                  />
+                </hlm-field>
+                <hlm-field class="content-start gap-2">
+                  <label hlmFieldLabel [for]="'server-client-' + i">Client ID</label>
+                  <input
+                    hlmInput
+                    [id]="'server-client-' + i"
+                    class="h-10 font-mono text-sm"
+                    formControlName="clientId"
+                    placeholder="eudiplo"
+                    spellcheck="false"
+                  />
+                </hlm-field>
+                <hlm-field class="content-start gap-2">
+                  <label hlmFieldLabel [for]="'server-secret-' + i">Client secret</label>
+                  <input
+                    hlmInput
+                    [id]="'server-secret-' + i"
+                    class="h-10 font-mono text-sm"
+                    type="password"
+                    formControlName="clientSecret"
+                    autocomplete="new-password"
+                  />
+                  <p hlmFieldDescription>
+                    A stored secret is kept unless you enter a new one; enter it again when the
+                    provider changes. Empty for a public client.
+                  </p>
+                </hlm-field>
+                <hlm-field class="content-start gap-2 md:col-span-2">
+                  <label hlmFieldLabel [for]="'server-scopes-' + i">Scopes</label>
+                  <input
+                    hlmInput
+                    [id]="'server-scopes-' + i"
+                    class="h-10 font-mono text-sm"
+                    formControlName="scopes"
+                    placeholder="openid profile email"
+                    spellcheck="false"
+                  />
+                </hlm-field>
+              </div>
+              }
+
+              <div class="grid gap-x-5 gap-y-4 border-t pt-4 md:grid-cols-2">
+                <hlm-field class="content-start gap-2">
+                  <label hlmFieldLabel [for]="'server-lifetime-' + i"
+                    >Access token lifetime (seconds)</label
+                  >
+                  <input
+                    hlmInput
+                    [id]="'server-lifetime-' + i"
+                    class="h-10"
+                    type="number"
+                    min="60"
+                    formControlName="tokenLifetime"
+                  />
+                  <p hlmFieldDescription>Default {{ defaultTokenLifetime(type) }} seconds.</p>
+                  <hlm-field-error validator="min">At least 60 seconds.</hlm-field-error>
+                </hlm-field>
+                <hlm-field class="content-start gap-2">
+                  <label hlmFieldLabel [for]="'server-key-' + i">Signing key</label>
+                  <hlm-native-select
+                    class="w-full"
+                    selectClass="h-10"
+                    [selectId]="'server-key-' + i"
+                    formControlName="signingKeyId"
+                  >
+                    <option value="" [selected]="!server.controls.signingKeyId.value">
+                      The tenant's authorization server key
+                    </option>
+                    @for (chain of serverKeys(); track chain.id) {
+                    <option
+                      [value]="chain.id"
+                      [selected]="server.controls.signingKeyId.value === chain.id"
+                    >
+                      {{ chain.description ? chain.description + ' (' + chain.id + ')' : chain.id }}
+                    </option>
+                    } @if (serverKeyUnusable(server.controls.signingKeyId.value)) {
+                    <option [value]="server.controls.signingKeyId.value" selected>
+                      {{ server.controls.signingKeyId.value }} (not usable)
+                    </option>
+                    }
+                  </hlm-native-select>
+                  @if (serverKeyUnusable(server.controls.signingKeyId.value)) {
+                  <p class="text-destructive text-sm">
+                    This key does not exist or is no authorization server key, so token requests
+                    fail.
+                    <a class="underline" routerLink="/keys/create" target="_blank" rel="noopener"
+                      >Create one</a
+                    >, then
+                    <button type="button" class="underline" (click)="checkKeysAgain()">
+                      check again</button
+                    >.
+                  </p>
+                  } @else if (keyChains.isSuccess() && !serverKeys().length) {
+                  <p hlmFieldDescription>
+                    No authorization server key exists yet; EUDIPLO creates one on the first token
+                    request.
+                  </p>
+                  } @else {
+                  <p hlmFieldDescription>Signs this server's access tokens.</p>
+                  }
+                </hlm-field>
+                <label
+                  class="flex cursor-pointer items-center gap-2.5 text-sm"
+                  [for]="'server-refresh-' + i"
+                  ><hlm-switch [inputId]="'server-refresh-' + i" formControlName="refreshTokens" />
+                  Issue refresh tokens</label
+                >
+                @if (server.controls.refreshTokens.value) {
+                <hlm-field class="content-start gap-2">
+                  <label hlmFieldLabel [for]="'server-refresh-lifetime-' + i"
+                    >Refresh token lifetime (seconds)</label
+                  >
+                  <input
+                    hlmInput
+                    [id]="'server-refresh-lifetime-' + i"
+                    class="h-10"
+                    type="number"
+                    min="1"
+                    formControlName="refreshLifetime"
+                  />
+                  <p hlmFieldDescription>Default 2592000 (30 days).</p>
+                </hlm-field>
+                }
+              </div>
+
+              <div class="grid gap-x-5 gap-y-4 border-t pt-4 md:grid-cols-2">
+                <hlm-field class="content-start gap-2">
+                  <label hlmFieldLabel [for]="'server-attestation-' + i">Wallet attestation</label>
+                  <hlm-native-select
+                    class="w-full"
+                    selectClass="h-10"
+                    [selectId]="'server-attestation-' + i"
+                    formControlName="walletAttestation"
+                  >
+                    <option
+                      value="inherit"
+                      [selected]="server.controls.walletAttestation.value === 'inherit'"
+                    >
+                      The issuer's default
+                    </option>
+                    <option
+                      value="required"
+                      [selected]="server.controls.walletAttestation.value === 'required'"
+                    >
+                      Required
+                    </option>
+                    <option
+                      value="optional"
+                      [selected]="server.controls.walletAttestation.value === 'optional'"
+                    >
+                      Optional
+                    </option>
+                  </hlm-native-select>
+                </hlm-field>
+                <hlm-field class="content-start gap-2">
+                  <label hlmFieldLabel [for]="'server-status-' + i">Attestation status check</label>
+                  <hlm-native-select
+                    class="w-full"
+                    selectClass="h-10"
+                    [selectId]="'server-status-' + i"
+                    formControlName="statusCheck"
+                  >
+                    <option
+                      value="inherit"
+                      [selected]="server.controls.statusCheck.value === 'inherit'"
+                    >
+                      The issuer's default ({{ issuerStatusCheck() }})
+                    </option>
+                    <option
+                      value="strict"
+                      [selected]="server.controls.statusCheck.value === 'strict'"
+                    >
+                      Strict
+                    </option>
+                    <option
+                      value="best_effort"
+                      [selected]="server.controls.statusCheck.value === 'best_effort'"
+                    >
+                      Best effort
+                    </option>
+                    <option
+                      value="disabled"
+                      [selected]="server.controls.statusCheck.value === 'disabled'"
+                    >
+                      Disabled
+                    </option>
+                  </hlm-native-select>
+                  <p hlmFieldDescription>Disabled accepts revoked wallet attestations.</p>
+                </hlm-field>
+                <label
+                  class="flex cursor-pointer items-start gap-2.5 text-sm md:col-span-2"
+                  [for]="'server-inherit-' + i"
+                >
+                  <hlm-switch
+                    class="mt-0.5"
+                    [inputId]="'server-inherit-' + i"
+                    formControlName="inheritTrustLists"
+                  />
+                  <span
+                    >Use the issuer's wallet provider trust lists<span
+                      class="text-muted-foreground block text-xs"
+                      >These lists authenticate the wallet at this server; key attestations at the
+                      credential endpoint always use the issuer's lists.</span
+                    ></span
+                  >
+                </label>
+                @if (!server.controls.inheritTrustLists.value) {
+                <div class="md:col-span-2">
+                  <ng-container
+                    *ngTemplateOutlet="trustListEditor; context: { $implicit: server.controls.trustLists, prefix: 'server-' + i }"
+                  />
+                </div>
+                }
+              </div>
+              }
+            </div>
+            }
+          </div>
+          } @empty {
+          <p class="text-muted-foreground text-sm">No authorization server yet.</p>
+          }
+        </div>
+        <button hlmBtn variant="outline" type="button" class="mt-4" (click)="addServer()">
+          <ng-icon name="lucidePlus" aria-hidden="true" />
+          Add authorization server
+        </button>
+      </section>
+
+      <section
+        class="bg-card rounded-2xl p-5 ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="behavior-heading"
+      >
+        <h2 id="behavior-heading" class="font-semibold">Issuance behavior</h2>
+        <p class="text-muted-foreground mt-1 text-sm">{{ behaviorSummary() }}</p>
+        <div class="mt-4 grid gap-4 text-sm">
+          <hlm-field class="max-w-xs content-start gap-2">
+            <label hlmFieldLabel for="issuer-batch">Batch size</label>
+            <input
+              hlmInput
+              id="issuer-batch"
+              class="h-10"
+              type="number"
+              min="1"
+              formControlName="batchSize"
+            />
+            <p hlmFieldDescription>Credentials issued per request; default 1.</p>
+            <hlm-field-error validator="min">At least 1.</hlm-field-error>
+          </hlm-field>
+          <label class="flex cursor-pointer items-start gap-3" for="issuer-dpop"
+            ><hlm-switch class="mt-0.5" inputId="issuer-dpop" formControlName="dPopRequired" /><span
+              ><span class="font-medium">Require DPoP</span
+              ><span class="text-muted-foreground block"
+                >Sender-constrained tokens. Turn off if your wallet does not support DPoP.</span
+              ></span
+            ></label
+          >
+          <label class="flex cursor-pointer items-start gap-3" for="issuer-response-enc"
+            ><hlm-switch
+              class="mt-0.5"
+              inputId="issuer-response-enc"
+              formControlName="credentialResponseEncryption"
+            /><span
+              ><span class="font-medium">Offer encrypted credential responses</span
+              ><span class="text-muted-foreground block"
+                >Advertises credential_response_encryption. Some wallets reject metadata that offers
+                encryption they lack; leave it off unless you need it.</span
+              ></span
+            ></label
+          >
+          <label class="flex cursor-pointer items-start gap-3" for="issuer-request-enc"
+            ><hlm-switch
+              class="mt-0.5"
+              inputId="issuer-request-enc"
+              formControlName="credentialRequestEncryption"
+            /><span
+              ><span class="font-medium">Require encrypted credential requests</span
+              ><span class="text-muted-foreground block"
+                >Wallets must then send credential requests as JWE. Leave it off unless your
+                conformance profile needs it.</span
+              ></span
+            ></label
+          >
+          <label class="flex cursor-pointer items-start gap-3" for="issuer-notifications"
+            ><hlm-switch
+              class="mt-0.5"
+              inputId="issuer-notifications"
+              formControlName="notificationEndpointEnabled"
+            /><span
+              ><span class="font-medium">Notification endpoint</span
+              ><span class="text-muted-foreground block"
+                >Lets wallets report what they did with a credential.</span
+              ></span
+            ></label
+          >
+        </div>
+      </section>
+      } @case (2) {
+      <p class="text-muted-foreground text-sm">{{ trustSummary() }}</p>
+      <section
+        class="bg-card rounded-2xl p-5 ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="txcode-heading"
+      >
+        <h2 id="txcode-heading" class="font-semibold">Transaction code</h2>
+        <hlm-field class="mt-4 max-w-xs content-start gap-2">
+          <label hlmFieldLabel for="issuer-txcode">Wrong PIN attempts allowed</label>
+          <input
+            hlmInput
+            id="issuer-txcode"
+            class="h-10"
+            type="number"
+            min="1"
+            formControlName="txCodeMaxAttempts"
+            placeholder="5"
+          />
+          <p hlmFieldDescription>
+            After that many, the pre-authorized code stops working. Empty uses 5.
+          </p>
+          <hlm-field-error validator="min">At least 1.</hlm-field-error>
+        </hlm-field>
+      </section>
+
+      <section
+        class="bg-card rounded-2xl p-5 ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="wallet-heading"
+      >
+        <h2 id="wallet-heading" class="font-semibold">Wallet providers</h2>
+        <div class="mt-4 grid gap-4 text-sm">
+          <label class="flex cursor-pointer items-start gap-3" for="issuer-attestation"
+            ><hlm-switch
+              class="mt-0.5"
+              inputId="issuer-attestation"
+              formControlName="walletAttestationRequired"
+            /><span
+              ><span class="font-medium">Require wallet attestations</span
+              ><span class="text-muted-foreground block"
+                >Wallets send OAuth-Client-Attestation headers at PAR and token endpoints, unless a
+                server decides otherwise.</span
+              ></span
+            ></label
+          >
+          <hlm-field class="max-w-sm content-start gap-2">
+            <label hlmFieldLabel for="issuer-status-check">Attestation status check</label>
+            <hlm-native-select
+              class="w-full"
+              selectClass="h-10"
+              selectId="issuer-status-check"
+              formControlName="statusCheck"
+            >
+              <option value="" [selected]="!value().statusCheck">
+                EUDIPLO's default (best effort)
+              </option>
+              <option value="strict" [selected]="value().statusCheck === 'strict'">Strict</option>
+              <option value="best_effort" [selected]="value().statusCheck === 'best_effort'">
+                Best effort
+              </option>
+              <option value="disabled" [selected]="value().statusCheck === 'disabled'">
+                Disabled
+              </option>
+            </hlm-native-select>
+            <p hlmFieldDescription>
+              Strict rejects an attestation whose status list cannot be fetched; best effort accepts
+              it then; disabled accepts revoked ones.
+            </p>
+          </hlm-field>
+          <div>
+            <h3 class="font-medium">Wallet provider trust lists</h3>
+            <p class="text-muted-foreground mt-0.5">
+              They validate key attestations during issuance and are the servers' default for wallet
+              attestations.
+            </p>
+            <div class="mt-3">
+              <ng-container
+                *ngTemplateOutlet="trustListEditor; context: { $implicit: form.controls.trustLists, prefix: 'issuer' }"
+              />
+            </div>
+            @if (!value().trustLists.length) {
+            <p class="text-warning mt-2">Without a list, key attestations are rejected.</p>
+            }
+          </div>
+        </div>
+      </section>
+
+      <section
+        class="bg-card rounded-2xl p-5 ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="federation-heading"
+        formGroupName="federation"
+      >
+        <h2 id="federation-heading" class="font-semibold">OpenID Federation</h2>
+        <label class="mt-3 flex cursor-pointer items-start gap-3 text-sm" for="fed-enabled">
+          <hlm-switch class="mt-0.5" inputId="fed-enabled" formControlName="enabled" />
+          <span
+            ><span class="font-medium">Evaluate trust through federation trust anchors</span
+            ><span class="text-muted-foreground block"
+              >With an entity ID, EUDIPLO also publishes this tenant's entity configuration.</span
+            ></span
+          >
+        </label>
+        @if (!value().federation.enabled && wasPublished()) {
+        <p class="border-warning/30 bg-warning/8 mt-3 rounded-xl border px-4 py-3 text-sm">
+          Saving with federation off stops publishing the entity configuration and breaks requests
+          that use the OpenID Federation client identifier. @if (carriedNames().length) { The
+          settings {{ carriedNames().join(', ') }} are dropped as well. }
+        </p>
+        } @if (value().federation.enabled) {
+        <div class="mt-4 grid gap-x-6 gap-y-4 md:grid-cols-2">
+          <hlm-field class="content-start gap-2">
+            <label hlmFieldLabel for="fed-mode">Trust decision</label>
+            <hlm-native-select
+              class="w-full"
+              selectClass="h-10"
+              selectId="fed-mode"
+              formControlName="mode"
+            >
+              <option value="hybrid" [selected]="value().federation.mode === 'hybrid'">
+                Federation first, trust lists as fallback
+              </option>
+              <option
+                value="federation-only"
+                [selected]="value().federation.mode === 'federation-only'"
+              >
+                Federation only
+              </option>
+            </hlm-native-select>
+          </hlm-field>
+          <hlm-field class="content-start gap-2">
+            <label hlmFieldLabel for="fed-ttl">Cache (seconds)</label>
+            <input
+              hlmInput
+              id="fed-ttl"
+              class="h-10"
+              type="number"
+              min="0"
+              formControlName="cacheTtlSeconds"
+            />
+          </hlm-field>
+          <hlm-field class="content-start gap-2 md:col-span-2">
+            <label hlmFieldLabel for="fed-entity">Entity ID</label>
+            <input
+              hlmInput
+              id="fed-entity"
+              class="h-10 font-mono text-sm"
+              type="url"
+              formControlName="entityId"
+              placeholder="https://eudiplo.example.com/issuers/my-tenant"
+              spellcheck="false"
+            />
+            <p hlmFieldDescription>
+              @if (expectedEntityId()) { Set it to {{ expectedEntityId() }} to publish the entity
+              configuration there. } Leave it empty to only evaluate trust.
+            </p>
+            <hlm-field-error validator="pattern"
+              >Enter an https URL without spaces, query or fragment.</hlm-field-error
+            >
+            @if (expectedEntityId() && value().federation.entityId.trim() !== expectedEntityId()) {
+            <button
+              hlmBtn
+              variant="outline"
+              size="sm"
+              type="button"
+              class="justify-self-start"
+              (click)="useExpectedEntityId()"
+            >
+              Use {{ expectedEntityId() }}
+            </button>
+            } @if (entityIdDiffers()) {
+            <p class="text-warning text-sm">
+              Wallets and trust anchors fetch the entity configuration from &lt;entity
+              ID&gt;/.well-known/openid-federation; another URL than {{ expectedEntityId() }} only
+              works behind a reverse proxy that maps it there.
+            </p>
+            } @if (federationKeyMissing()) {
+            <p class="text-destructive text-sm">
+              @if (pinnedFederationKey()) { The pinned key {{ pinnedFederationKey() }} is no
+              federation key, so the entity configuration is not published. Change the pin as JSON.
+              } @else { No federation key exists to sign the entity configuration.
+              <a
+                class="underline"
+                routerLink="/keys/create"
+                [queryParams]="{ usage: 'federation' }"
+                target="_blank"
+                rel="noopener"
+                >Create one</a
+              >, then
+              <button type="button" class="underline" (click)="checkKeysAgain()">check again</button
+              >. }
+            </p>
+            }
+          </hlm-field>
+          <div class="md:col-span-2" formArrayName="trustAnchors">
+            <h3 class="text-sm font-medium">Trust anchors</h3>
+            <div class="mt-2 grid gap-3">
+              @for (anchor of anchorsArray.controls; track anchor; let i = $index) {
+              <div
+                class="grid gap-3 rounded-xl border p-4 md:grid-cols-[1fr_1fr_auto]"
+                [formGroupName]="i"
+              >
+                <app-federation-trust-anchor-select
+                  formControlName="entityId"
+                  [label]="'Trust anchor ' + (i + 1)"
+                  (anchorSelected)="onAnchorPicked(i, $event)"
+                />
+                <hlm-field class="content-start gap-2">
+                  <label hlmFieldLabel [for]="'anchor-uri-' + i">Entity configuration URI</label>
+                  <input
+                    hlmInput
+                    [id]="'anchor-uri-' + i"
+                    class="h-10 font-mono text-sm"
+                    type="url"
+                    formControlName="entityConfigurationUri"
+                    spellcheck="false"
+                  />
+                  <hlm-field-error validator="required">Enter the URI.</hlm-field-error>
+                </hlm-field>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-sm"
+                  type="button"
+                  class="hover:text-destructive self-start md:mt-6"
+                  [attr.aria-label]="'Remove trust anchor ' + (i + 1)"
+                  hlmTooltip="Remove"
+                  (click)="removeAnchor(i)"
+                >
+                  <ng-icon name="lucideTrash2" />
+                </button>
+              </div>
+              }
+            </div>
+            <button
+              hlmBtn
+              variant="outline"
+              size="sm"
+              type="button"
+              class="mt-3"
+              (click)="addAnchor()"
+            >
+              <ng-icon name="lucidePlus" aria-hidden="true" /> Add trust anchor
+            </button>
+          </div>
+        </div>
+        }
+      </section>
+
+      <section
+        class="bg-card rounded-2xl p-5 ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="registration-heading"
+        formGroupName="registration"
+      >
+        <h2 id="registration-heading" class="font-semibold">Registration certificate</h2>
+        <label class="mt-3 flex cursor-pointer items-start gap-3 text-sm" for="reg-enabled">
+          <hlm-switch class="mt-0.5" inputId="reg-enabled" formControlName="enabled" />
+          <span
+            ><span class="font-medium">Publish a registration certificate</span
+            ><span class="text-muted-foreground block"
+              >Adds registration_cert to issuer_info in the issuer metadata.</span
+            ></span
+          >
+        </label>
+        @if (value().registration.enabled) {
+        <div class="mt-4 grid gap-x-6 gap-y-4 md:grid-cols-2">
+          <hlm-field class="content-start gap-2">
+            <label hlmFieldLabel for="reg-mode">Source</label>
+            <hlm-native-select
+              class="w-full"
+              selectClass="h-10"
+              selectId="reg-mode"
+              formControlName="mode"
+            >
+              <option value="generate" [selected]="value().registration.mode === 'generate'">
+                EUDIPLO requests it from the registrar
+              </option>
+              <option value="import" [selected]="value().registration.mode === 'import'">
+                Paste an existing certificate
+              </option>
+            </hlm-native-select>
+          </hlm-field>
+          @if (value().registration.mode === 'import') {
+          <hlm-field class="content-start gap-2 md:col-span-2">
+            <label hlmFieldLabel for="reg-jwt">Registration certificate (JWT)</label>
+            <textarea
+              hlmTextarea
+              id="reg-jwt"
+              class="min-h-32 font-mono text-xs"
+              formControlName="jwt"
+              placeholder="eyJ…"
+              spellcheck="false"
+            ></textarea>
+          </hlm-field>
+          } @else {
+          <p class="text-muted-foreground text-sm md:col-span-2">
+            The attestations it names come from your credential types: the vct of each SD-JWT VC
+            type and the docType of each mdoc type.
+            <button
+              hlmBtn
+              variant="link"
+              size="sm"
+              type="button"
+              class="h-auto p-0"
+              (click)="useRegistrarDefaults()"
+            >
+              Use the registrar defaults
+            </button>
+          </p>
+          <hlm-field class="content-start gap-2">
+            <label hlmFieldLabel for="reg-privacy">Privacy policy URL</label>
+            <input
+              hlmInput
+              id="reg-privacy"
+              class="h-10 font-mono text-sm"
+              type="url"
+              formControlName="privacyPolicy"
+              placeholder="https://issuer.example/privacy"
+              spellcheck="false"
+            />
+          </hlm-field>
+          <hlm-field class="content-start gap-2">
+            <label hlmFieldLabel for="reg-support">Support URI</label>
+            <input
+              hlmInput
+              id="reg-support"
+              class="h-10 font-mono text-sm"
+              formControlName="supportUri"
+              placeholder="mailto:support@issuer.example"
+              spellcheck="false"
+            />
+          </hlm-field>
+          <hlm-field class="content-start gap-2 md:col-span-2">
+            <label hlmFieldLabel for="reg-renewal">Renewal</label>
+            <hlm-native-select
+              class="w-full"
+              selectClass="h-10"
+              selectId="reg-renewal"
+              formControlName="renewal"
+            >
+              <option
+                value="onCredentialConfigChange"
+                [selected]="value().registration.renewal === 'onCredentialConfigChange'"
+              >
+                When credential types or these settings change (default)
+              </option>
+              <option
+                value="onMetadataRequest"
+                [selected]="value().registration.renewal === 'onMetadataRequest'"
+              >
+                On the next metadata request
+              </option>
+              <option value="manual" [selected]="value().registration.renewal === 'manual'">
+                Only by hand
+              </option>
+            </hlm-native-select>
+            <p hlmFieldDescription>
+              @switch (value().registration.renewal) { @case ('onMetadataRequest') { A change gets a
+              new certificate when a wallet next fetches the issuer metadata. } @case ('manual') {
+              After a change, regenerate it on the issuer settings page; until then wallets get the
+              old one. A missing or expired certificate is still requested. } @default { A new
+              certificate is requested in the background after you save a credential type or these
+              settings. } }
+            </p>
+          </hlm-field>
+          }
+        </div>
+        }
+      </section>
+      } @case (3) {
+      <section
+        class="bg-card rounded-2xl p-5 ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+        aria-labelledby="review-heading"
+      >
+        <h2 id="review-heading" class="font-semibold">Review</h2>
+        <dl class="mt-3 divide-y text-sm">
+          <div class="flex gap-3 py-3">
+            <dt class="text-muted-foreground w-36 shrink-0">Issuer</dt>
+            <dd>
+              @for (display of value().displays; track $index) {
+              <span class="block"
+                >{{ display.name }}
+                <span class="text-muted-foreground font-mono text-xs"
+                  >{{ display.locale }}</span
+                ></span
+              >
+              }
+            </dd>
+          </div>
+          <div class="flex gap-3 py-3">
+            <dt class="text-muted-foreground w-36 shrink-0">Wallet access</dt>
+            <dd>
+              @for (server of value().servers; track $index) {
+              <span class="block"
+                >{{ server.label || server.id }} · {{ server.type }} · {{ server.type === 'external'
+                || server.enabled ? 'enabled' : 'disabled' }}</span
+              >
+              } @empty { No authorization server }
+            </dd>
+          </div>
+          <div class="flex gap-3 py-3">
+            <dt class="text-muted-foreground w-36 shrink-0">Behavior</dt>
+            <dd>{{ behaviorSummary() }}</dd>
+          </div>
+          <div class="flex gap-3 py-3">
+            <dt class="text-muted-foreground w-36 shrink-0">Trust</dt>
+            <dd>{{ trustSummary() }}</dd>
+          </div>
+        </dl>
+        <p class="text-muted-foreground mt-3 text-sm">
+          Each credential type chooses its signing key. After saving,
+          <a class="text-primary font-medium hover:underline" routerLink="/credential-config/create"
+            >add a credential type</a
+          >
+          to define what you issue.
+        </p>
+      </section>
+      } }
+    </fieldset>
+
+    <div class="flex flex-wrap items-center justify-end gap-3">
+      @if (locked()) {
+      <p id="save-locked" class="text-muted-foreground me-auto text-sm">{{ locked() }}</p>
+      }
+      <a hlmBtn variant="ghost" routerLink="/issuance-config">Cancel</a>
+      @if (guided() && step() > 0) {
+      <button
+        hlmBtn
+        variant="outline"
+        type="button"
+        [attr.aria-disabled]="saving() || null"
+        (click)="back()"
+      >
+        <ng-icon name="lucideArrowLeft" aria-hidden="true" /> Back
+      </button>
+      }
+      <button
+        hlmBtn
+        type="submit"
+        [class.cursor-not-allowed]="!!locked()"
+        [class.opacity-50]="!!locked()"
+        [attr.aria-disabled]="saving() || !!locked() || null"
+        [attr.aria-busy]="saving() || null"
+        [attr.aria-describedby]="locked() ? 'save-locked' : null"
+      >
+        @if (saving()) { <hlm-spinner class="size-4" /> Saving… } @else if (guided() && step() < 3)
+        { Continue <ng-icon name="lucideArrowRight" aria-hidden="true" /> } @else { Save settings }
+      </button>
+    </div>
+  </form>
+</div>
+}
+
+<ng-template #trustListEditor let-list let-prefix="prefix">
+  <div class="grid gap-3">
+    @for (entry of $any(list).controls; track entry; let j = $index) { @let id = prefix + '-list-' +
+    j;
+    <div class="grid gap-3 rounded-xl border p-3 md:grid-cols-[10rem_1fr_auto]" [formGroup]="entry">
+      <hlm-native-select
+        class="w-full"
+        selectClass="h-10"
+        [selectId]="id + '-mode'"
+        formControlName="mode"
+        [attr.aria-label]="'Kind of trust list ' + (j + 1)"
+      >
+        <option value="managed" [selected]="entry.controls.mode.value === 'managed'">
+          Of this tenant
+        </option>
+        <option value="external" [selected]="entry.controls.mode.value === 'external'">
+          External
+        </option>
+      </hlm-native-select>
+      @if (entry.controls.mode.value === 'managed') {
+      <div class="grid gap-1">
+        <hlm-native-select
+          class="w-full"
+          selectClass="h-10"
+          [selectId]="id + '-managed'"
+          formControlName="trustListId"
+          [attr.aria-label]="'Trust list ' + (j + 1)"
+        >
+          <option value="" disabled [selected]="!entry.controls.trustListId.value">
+            Choose a trust list…
+          </option>
+          @if (managedNote(entry.controls.trustListId.value); as note) {
+          <option [value]="entry.controls.trustListId.value" selected>
+            {{ entry.controls.trustListId.value }} ({{ note }})
+          </option>
+          } @for (option of walletProviderLists(); track option.id) {
+          <option [value]="option.id" [selected]="entry.controls.trustListId.value === option.id">
+            {{ option.description || option.id }} ({{ option.id }})
+          </option>
+          }
+        </hlm-native-select>
+        @if (trustListsAll.isError()) {
+        <p class="text-destructive text-xs">
+          The trust lists could not be loaded.
+          <button type="button" class="underline" (click)="trustListsAll.refetch()">Retry</button>
+        </p>
+        } @else if (trustListsAll.isSuccess() && !walletProviderLists().length) {
+        <p class="text-muted-foreground text-xs">
+          No trust list of this tenant names a wallet provider.
+          <a class="underline" routerLink="/trust-list/create" target="_blank" rel="noopener"
+            >Create one</a
+          >.
+        </p>
+        }
+      </div>
+      } @else {
+      <div class="grid gap-2">
+        <input
+          hlmInput
+          [id]="id + '-url'"
+          class="h-10 font-mono text-sm"
+          type="url"
+          formControlName="url"
+          placeholder="https://trust-list.example.com/wallet-providers"
+          [attr.aria-label]="'URL of trust list ' + (j + 1)"
+          spellcheck="false"
+        />
+        <textarea
+          hlmTextarea
+          [id]="id + '-cert'"
+          class="min-h-20 font-mono text-xs"
+          formControlName="certificate"
+          placeholder="-----BEGIN CERTIFICATE-----"
+          [attr.aria-label]="'Signing certificate of trust list ' + (j + 1)"
+          spellcheck="false"
+        ></textarea>
+        @if (pinnedKey(entry); as kind) {
+        <p class="text-muted-foreground text-xs">
+          A stored {{ kind }} public key checks this list until a certificate replaces it.
+        </p>
+        } @if (entry.controls.certificate.errors?.['certificate']) {
+        <p class="text-destructive text-xs">Paste a certificate in PEM or base64 DER.</p>
+        } @if (entry.touched && entry.errors?.['missingUrl']) {
+        <p class="text-destructive text-xs">Enter the URL of the list.</p>
+        } @else if (entry.touched && entry.errors?.['missingVerifier']) {
+        <p class="text-destructive text-xs">Paste the certificate that signs the list.</p>
+        }
+      </div>
+      }
+      <button
+        hlmBtn
+        variant="ghost"
+        size="icon-sm"
+        type="button"
+        class="hover:text-destructive"
+        [attr.aria-label]="'Remove trust list ' + (j + 1)"
+        hlmTooltip="Remove"
+        (click)="$any(list).removeAt(j)"
+      >
+        <ng-icon name="lucideTrash2" />
+      </button>
+    </div>
+    }
+    <div class="flex flex-wrap gap-2">
+      <button
+        hlmBtn
+        variant="outline"
+        size="sm"
+        type="button"
+        (click)="addTrustList(list, 'managed')"
+      >
+        <ng-icon name="lucidePlus" aria-hidden="true" /> Trust list of this tenant
+      </button>
+      <button
+        hlmBtn
+        variant="outline"
+        size="sm"
+        type="button"
+        (click)="addTrustList(list, 'external')"
+      >
+        <ng-icon name="lucidePlus" aria-hidden="true" /> External trust list
+      </button>
+    </div>
+  </div>
+</ng-template>
+
+<hlm-dialog [state]="jsonOpen() ? 'open' : 'closed'" (closed)="jsonOpen.set(false)">
+  <hlm-dialog-content *hlmDialogPortal="let ctx" class="sm:max-w-3xl">
+    <hlm-dialog-header>
+      <h2 hlmDialogTitle>Edit as JSON</h2>
+      <p hlmDialogDescription>
+        The issuer settings as the API takes them. Applying them fills the form; nothing is saved
+        yet.
+      </p>
+    </hlm-dialog-header>
+    <label for="issuer-json" class="sr-only">Issuer settings as JSON</label>
+    <textarea
+      hlmTextarea
+      id="issuer-json"
+      class="h-[60vh] w-full font-mono text-xs"
+      spellcheck="false"
+      [value]="jsonText()"
+      (input)="jsonText.set($any($event.target).value)"
+    ></textarea>
+    @if (jsonError()) {
+    <p class="text-destructive text-sm" role="alert">{{ jsonError() }}</p>
+    }
+    <hlm-dialog-footer>
+      <button hlmBtn variant="ghost" type="button" (click)="jsonOpen.set(false)">Cancel</button>
+      <button hlmBtn type="button" (click)="applyJson()">Apply to the form</button>
+    </hlm-dialog-footer>
+  </hlm-dialog-content>
+</hlm-dialog>
