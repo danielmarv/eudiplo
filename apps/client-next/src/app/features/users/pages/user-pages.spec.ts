@@ -79,7 +79,7 @@ describe('user pages', () => {
             return json({ statusCode: 501, message: 'Keycloak manages no people here.' }, 501);
           }
           if (call.method === 'POST') {
-            return json({ id: 'u3', ...(body as object), temporaryPassword: 'Tmp-1234' }, 201);
+            return json({ id: 'u3', ...(body as object), temporaryPassword: 'example-password' }, 201);
           }
           return json(users);
         }
@@ -154,7 +154,7 @@ describe('user pages', () => {
       )
     );
     button('Add person')!.click();
-    await settle(() => expect(text()).toContain('Tmp-1234'));
+    await settle(() => expect(text()).toContain('example-password'));
     expect(requests).toContainEqual({
       method: 'POST',
       path: '/api/user',

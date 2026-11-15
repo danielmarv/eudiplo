@@ -86,7 +86,7 @@ describe('TenantDetail', () => {
         if (req.method === 'DELETE') return json(null, 204);
         if (path === '/api/tenant/acme') return json(tenant);
         if (path === '/api/tenant') return json([tenant]);
-        if (path === '/api/client/acme-issuer/rotate-secret') return json({ secret: 'n3w' }, 201);
+        if (path === '/api/client/acme-issuer/rotate-secret') return json({ secret: 'rotated-secret' }, 201);
         return json({ statusCode: 404, message: 'Tenant not found' }, 404);
       },
     });
@@ -221,7 +221,7 @@ describe('TenantDetail', () => {
     button('Replace the secret of acme-issuer')!.click();
     await settle(() => expect(button('Replace secret')).toBeDefined());
     button('Replace secret')!.click();
-    await settle(() => expect(text()).toContain('n3w'));
+    await settle(() => expect(text()).toContain('rotated-secret'));
     expect(requests).toContain('POST /api/client/acme-issuer/rotate-secret');
   });
 });

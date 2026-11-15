@@ -58,7 +58,7 @@ describe('presentation configuration form', () => {
     expect(form.controls.description.invalid).toBe(true);
     form.controls.description.setValue('Verify age');
     expect(form.controls.registrationJwt.invalid).toBe(true);
-    form.controls.registrationJwt.setValue('eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJ4In0.signature');
+    form.controls.registrationJwt.setValue('header.payload.signature');
     expect(form.controls.registrationJwt.valid).toBe(true);
 
     form.patchValue({ registrationMode: 'body' });

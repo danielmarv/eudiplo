@@ -209,7 +209,7 @@ describe('TenantForm', () => {
   });
 
   it('adds a tenant with an admin client and shows its secret once before opening it', async () => {
-    created['client'] = { clientId: 'acme-bank-admin', clientSecret: 's3cret' };
+    created['client'] = { clientId: 'acme-bank-admin', clientSecret: 'example-secret' };
     const { settle } = await render();
     const router = TestBed.inject(Router);
     type('tenant-name', ' Acme Bank ');
@@ -217,7 +217,7 @@ describe('TenantForm', () => {
     page().querySelector<HTMLElement>('#role-issuance\\:offer')!.click();
 
     button('Add tenant')!.click();
-    await settle(() => expect(text()).toContain('s3cret'));
+    await settle(() => expect(text()).toContain('example-secret'));
     expect(writes()).toEqual([
       {
         call: 'POST /api/tenant',
@@ -307,12 +307,12 @@ describe('TenantForm', () => {
   });
 
   it('signs in as the new admin client through the login page, after saying it ends the session', async () => {
-    created['client'] = { clientId: 'acme-bank-admin', clientSecret: 's3cret' };
+    created['client'] = { clientId: 'acme-bank-admin', clientSecret: 'example-secret' };
     const { settle } = await render();
     const router = TestBed.inject(Router);
     type('tenant-name', 'Acme Bank');
     button('Add tenant')!.click();
-    await settle(() => expect(text()).toContain('s3cret'));
+    await settle(() => expect(text()).toContain('example-secret'));
     expect(text()).toContain('ends your session as local-admin');
 
     button('Sign in as this client')!.click();
@@ -322,19 +322,19 @@ describe('TenantForm', () => {
     expect(session.logout).toHaveBeenCalled();
     expect((TestBed.inject(Location).getState() as { signInAs?: unknown }).signInAs).toEqual({
       clientId: 'acme-bank-admin',
-      clientSecret: 's3cret',
+      clientSecret: 'example-secret',
       apiUrl: 'http://backend.test',
     });
-    expect(TestBed.inject(Location).path()).not.toContain('s3cret');
+    expect(TestBed.inject(Location).path()).not.toContain('example-secret');
   });
 
   it('offers no sign-in as the new client after a single sign-on', async () => {
     session.usesSso = () => true;
-    created['client'] = { clientId: 'acme-bank-admin', clientSecret: 's3cret' };
+    created['client'] = { clientId: 'acme-bank-admin', clientSecret: 'example-secret' };
     const { settle } = await render();
     type('tenant-name', 'Acme Bank');
     button('Add tenant')!.click();
-    await settle(() => expect(text()).toContain('s3cret'));
+    await settle(() => expect(text()).toContain('example-secret'));
 
     expect(button('Sign in as this client')).toBeUndefined();
   });

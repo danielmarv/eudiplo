@@ -73,7 +73,7 @@ describe('ConnectionSettings', () => {
       getBaseUrl: () => 'https://api.example.com',
       getoidcUrl: () => 'https://api.example.com',
       getClientId: () => 'acme-admin',
-      getClientSecret: () => 's3cret',
+      getClientSecret: () => 'example-secret',
       usesSso: () => false,
       getTokenTimeRemaining: () => 3_845_000,
       canRefreshToken: () => true,
@@ -164,14 +164,14 @@ describe('ConnectionSettings', () => {
 
   it('masks the secret of the tab that signed in, and shows or copies it on request', async () => {
     const { settle } = await render();
-    expect(text()).not.toContain('s3cret');
+    expect(text()).not.toContain('example-secret');
 
     button('Show the client secret')!.click();
-    await settle(() => expect(text()).toContain('s3cret'));
+    await settle(() => expect(text()).toContain('example-secret'));
 
     button('Copy the client secret')!.click();
     await settle(() => expect(notify.success).toHaveBeenCalledWith('Client secret copied.'));
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('s3cret');
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('example-secret');
   });
 
   it('shows the time left and that the session renews itself', async () => {

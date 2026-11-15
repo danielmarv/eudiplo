@@ -666,7 +666,7 @@ describe('Login with a kept session', () => {
     api.kept = false;
     history.replaceState(
       {
-        signInAs: { clientId: 'acme-admin', clientSecret: 's3cret', apiUrl: 'http://backend.test' },
+        signInAs: { clientId: 'acme-admin', clientSecret: 'example-secret', apiUrl: 'http://backend.test' },
       },
       ''
     );
@@ -675,7 +675,7 @@ describe('Login with a kept session', () => {
 
     expect(api.loginWithClientCredentials).toHaveBeenCalledWith(
       'acme-admin',
-      's3cret',
+      'example-secret',
       'http://backend.test',
       undefined
     );

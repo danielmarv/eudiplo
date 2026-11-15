@@ -192,7 +192,7 @@ describe('config portability page', () => {
                 ...plan(),
                 operationId: 'op-2',
                 generatedSecrets: [
-                  { kind: 'Client', id: 'shop', path: '/spec/secret', value: 'n3w-secret' },
+                  { kind: 'Client', id: 'shop', path: '/spec/secret', value: 'rotated-secret' },
                 ],
               },
               201
@@ -241,7 +241,7 @@ describe('config portability page', () => {
       .filter((candidate) => candidate.textContent?.trim() === 'Apply import')
       .at(-1)!
       .click();
-    await settle(() => expect(text()).toContain('n3w-secret'));
+    await settle(() => expect(text()).toContain('rotated-secret'));
     expect(requests).toContainEqual(
       expect.objectContaining({
         method: 'POST',

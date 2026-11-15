@@ -128,7 +128,7 @@ describe('RegistrarSettings', () => {
     button('Save configuration')!.click();
     await settle(() => expect(text()).toContain('Enter the password.'));
 
-    type('registrar-password', 's3cret');
+    type('registrar-password', 'example-secret');
     button('Save configuration')!.click();
     await settle(() =>
       expect(notify.success).toHaveBeenCalledWith('Registrar configuration saved.')
@@ -137,7 +137,7 @@ describe('RegistrarSettings', () => {
       registrarUrl: 'https://sandbox.eudi-wallet.org/api',
       clientId: 'swagger',
       username: 'acme',
-      password: 's3cret',
+      password: 'example-secret',
     });
     await settle(() =>
       expect(text(page().querySelector('[data-testid="registrar-state"]'))).toContain(

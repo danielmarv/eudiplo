@@ -117,12 +117,12 @@ describe('API client pages', () => {
             );
           }
           if (call.method === 'POST') {
-            return json({ ...(body as object), clientSecret: 's3cret-once' }, 201);
+            return json({ ...(body as object), clientSecret: 'new-client-secret' }, 201);
           }
           return json(clients);
         }
         const secret = /^\/api\/client\/([^/]+)\/rotate-secret$/.exec(path)?.[1];
-        if (secret) return json({ secret: 'n3w-secret' }, 201);
+        if (secret) return json({ secret: 'rotated-secret' }, 201);
         const one = /^\/api\/client\/([^/]+)$/.exec(path)?.[1];
         if (one) {
           const all = clients === 'unavailable' ? [] : clients;
@@ -193,7 +193,7 @@ describe('API client pages', () => {
       labelled('Replace the secret of crm').click();
       await settle(() => expect(button('Replace secret')).toBeDefined());
       button('Replace secret')!.click();
-      await settle(() => expect(text()).toContain('n3w-secret'));
+      await settle(() => expect(text()).toContain('rotated-secret'));
       expect(requests).toContainEqual(
         expect.objectContaining({ method: 'POST', path: '/api/client/crm/rotate-secret' })
       );
@@ -245,7 +245,7 @@ describe('API client pages', () => {
       );
       button('Add client')!.click();
 
-      await settle(() => expect(text()).toContain('s3cret-once'));
+      await settle(() => expect(text()).toContain('new-client-secret'));
       expect(requests).toContainEqual({
         method: 'POST',
         path: '/api/client',

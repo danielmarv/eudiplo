@@ -9,7 +9,7 @@ import { signInAs, takeSignInAs } from './sign-in-as';
 class Blank {}
 
 describe('sign in as a client', () => {
-  const client = { clientId: 'acme-admin', clientSecret: 's3cret', apiUrl: 'https://api.test' };
+  const client = { clientId: 'acme-admin', clientSecret: 'example-secret', apiUrl: 'https://api.test' };
 
   afterEach(() => history.replaceState(null, ''));
 
@@ -22,7 +22,7 @@ describe('sign in as a client', () => {
     await signInAs(router, client);
 
     expect(router.url).toBe('/login');
-    expect(TestBed.inject(Location).path()).not.toContain('s3cret');
+    expect(TestBed.inject(Location).path()).not.toContain('example-secret');
     expect((TestBed.inject(Location).getState() as { signInAs?: unknown }).signInAs).toEqual(
       client
     );

@@ -245,7 +245,7 @@ describe('attribute provider pages', () => {
         .querySelector<HTMLInputElement>('input[type="radio"]')!
         .click();
       await settle(() => expect(field('endpoint-key')).not.toBeNull());
-      type('endpoint-key', 's3cret');
+      type('endpoint-key', 'example-secret');
       button('Add attribute provider')!.click();
 
       await settle(() =>
@@ -255,7 +255,7 @@ describe('attribute provider pages', () => {
         id: 'loyalty-points',
         name: 'Loyalty Points',
         url: 'https://loyalty.example/claims',
-        auth: { type: 'apiKey', config: { headerName: 'X-API-Key', value: 's3cret' } },
+        auth: { type: 'apiKey', config: { headerName: 'X-API-Key', value: 'example-secret' } },
       });
     });
 
