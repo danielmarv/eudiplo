@@ -1,0 +1,756 @@
+<app-page-header
+  heading="Config portability"
+  description="Export this tenant's configuration as code, import it elsewhere after a read-only plan, and decide which resources files manage."
+>
+  <a
+    hlmBtn
+    variant="outline"
+    href="https://docs.eudiplo.dev/operate/configuration-as-code"
+    target="_blank"
+    rel="noopener"
+  >
+    <ng-icon name="lucideExternalLink" aria-hidden="true" />
+    Documentation
+  </a>
+</app-page-header>
+
+<div class="grid gap-6">
+  <div class="grid items-start gap-6 lg:grid-cols-2">
+    <section
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+      aria-labelledby="export-heading"
+    >
+      <div class="flex items-start gap-3">
+        <span
+          class="bg-accent text-accent-foreground grid size-10 shrink-0 place-items-center rounded-xl"
+          aria-hidden="true"
+        >
+          <ng-icon name="lucideArchive" />
+        </span>
+        <div>
+          <h2 id="export-heading" class="font-semibold">Export</h2>
+          <p class="text-muted-foreground mt-1 text-sm">
+            Secrets and private keys are never exported. The bundle holds environment placeholders,
+            external KMS references and a manifest of the values the target environment or its
+            secret manager supplies.
+          </p>
+        </div>
+      </div>
+      <div class="mt-5 flex flex-wrap gap-2">
+        <button
+          hlmBtn
+          type="button"
+          [attr.aria-disabled]="!!busy() || null"
+          [attr.aria-busy]="busy() === 'export' || null"
+          (click)="exportArchive()"
+        >
+          @if (busy() === 'export') {
+          <hlm-spinner class="size-4" />
+          } @else {
+          <ng-icon name="lucideDownload" aria-hidden="true" />
+          } Download archive
+        </button>
+        <button
+          hlmBtn
+          variant="outline"
+          type="button"
+          [attr.aria-disabled]="!!busy() || null"
+          [attr.aria-busy]="busy() === 'export-json' || null"
+          (click)="exportJson()"
+        >
+          @if (busy() === 'export-json') {
+          <hlm-spinner class="size-4" />
+          } @else {
+          <ng-icon name="lucideFileJson" aria-hidden="true" />
+          } Download editable JSON
+        </button>
+      </div>
+      <p class="text-muted-foreground mt-3 text-xs">
+        The archive (ZIP) also holds assets such as logos. The JSON bundle is easier to edit.
+      </p>
+    </section>
+
+    <section
+      class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+      aria-labelledby="import-heading"
+    >
+      <div class="flex items-start gap-3">
+        <span
+          class="bg-accent text-accent-foreground grid size-10 shrink-0 place-items-center rounded-xl"
+          aria-hidden="true"
+        >
+          <ng-icon name="lucideFileUp" />
+        </span>
+        <div>
+          <h2 id="import-heading" class="font-semibold">Import</h2>
+          <p class="text-muted-foreground mt-1 text-sm">
+            An archive, a JSON bundle, or one configuration document as a resource download saves
+            it. The plan is read-only and always comes first.
+          </p>
+        </div>
+      </div>
+
+      <div class="mt-5 grid gap-4">
+        <div class="flex min-w-0 flex-wrap items-center gap-3">
+          <label class="sr-only" for="bundle-file">Bundle or configuration document</label>
+          <input
+            #fileInput
+            id="bundle-file"
+            type="file"
+            class="hidden"
+            accept="application/zip,.zip,application/json,.json"
+            (change)="chooseFile($event)"
+          />
+          <button
+            hlmBtn
+            variant="outline"
+            type="button"
+            [attr.aria-disabled]="!!busy() || null"
+            (click)="busy() || fileInput.click()"
+          >
+            <ng-icon name="lucideFolderOpen" aria-hidden="true" />
+            Choose file
+          </button>
+          <span
+            class="min-w-0 truncate text-sm"
+            [class.text-muted-foreground]="!fileName()"
+            [class.font-mono]="!!fileName()"
+            >{{ fileName() || 'No file chosen' }}</span
+          >
+        </div>
+
+        <div class="grid gap-1.5">
+          <label class="text-sm font-medium" for="import-mode">Mode</label>
+          <hlm-native-select
+            class="w-full"
+            selectClass="h-10"
+            selectId="import-mode"
+            [value]="mode()"
+            (valueChange)="setMode($any($event))"
+          >
+            @for (option of modes; track option.value) {
+            <option [value]="option.value" [selected]="mode() === option.value">
+              {{ option.label }}
+            </option>
+            }
+          </hlm-native-select>
+          <p class="text-muted-foreground text-sm">{{ modeHint() }}</p>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          @let noFile = !source();
+          <span id="plan-blocked" class="sr-only">Choose a file to plan its import.</span>
+          <button
+            hlmBtn
+            type="button"
+            [class.opacity-50]="noFile"
+            [class.cursor-not-allowed]="noFile"
+            [attr.aria-disabled]="noFile || !!busy() || null"
+            [attr.aria-describedby]="noFile ? 'plan-blocked' : null"
+            [attr.aria-busy]="busy() === 'plan' || null"
+            (click)="makePlan()"
+          >
+            @if (busy() === 'plan') {
+            <hlm-spinner class="size-4" />
+            } @else {
+            <ng-icon name="lucideListChecks" aria-hidden="true" />
+            } Plan import
+          </button>
+          @if (plan() && !reattachTarget()) { @let blocked = !canApply();
+          <span id="apply-blocked" class="sr-only">
+            {{ plan()?.operationId ? 'This plan was applied already.' : 'Resolve the errors of the
+            plan first.' }}
+          </span>
+          <button
+            hlmBtn
+            variant="outline"
+            type="button"
+            [class.opacity-50]="blocked"
+            [class.cursor-not-allowed]="blocked"
+            [attr.aria-disabled]="blocked || !!busy() || null"
+            [attr.aria-describedby]="blocked ? 'apply-blocked' : null"
+            [attr.aria-busy]="busy() === 'apply' || null"
+            (click)="apply()"
+          >
+            @if (busy() === 'apply') {
+            <hlm-spinner class="size-4" />
+            } Apply import
+          </button>
+          }
+        </div>
+      </div>
+    </section>
+  </div>
+
+  @if (plan(); as current) {
+  <section
+    id="config-plan"
+    tabindex="-1"
+    class="bg-card scroll-mt-20 rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 sm:p-6 focus:outline-none"
+    [class]="current.applicable ? 'ring-primary/25' : 'ring-destructive/30'"
+    aria-labelledby="plan-heading"
+  >
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div class="flex items-start gap-3">
+        <ng-icon
+          [name]="current.applicable ? 'lucideCircleCheck' : 'lucideCircleX'"
+          class="mt-0.5 shrink-0 text-xl"
+          [class.text-success]="current.applicable"
+          [class.text-destructive]="!current.applicable"
+          aria-hidden="true"
+        />
+        <div>
+          <h2 id="plan-heading" class="font-semibold">{{ planTitle() }}</h2>
+          <p class="text-muted-foreground mt-0.5 text-sm" role="status">{{ planStatus() }}</p>
+        </div>
+      </div>
+      @if (reattachTarget()) { @let blocked = !canApply();
+      <button
+        hlmBtn
+        type="button"
+        [class.opacity-50]="blocked"
+        [class.cursor-not-allowed]="blocked"
+        [attr.aria-disabled]="blocked || !!busy() || null"
+        [attr.aria-busy]="busy() === 'apply' || null"
+        (click)="applyReset()"
+      >
+        @if (busy() === 'apply') {
+        <hlm-spinner class="size-4" />
+        } @else {
+        <ng-icon name="lucideRotateCcw" aria-hidden="true" />
+        } {{ reapplies() ? 'Apply from file' : 'Reset to file' }}
+      </button>
+      }
+    </div>
+
+    @if (current.issues.length) {
+    <ul class="mt-4 grid gap-1.5 text-sm">
+      @for (issue of current.issues; track issue.code + issue.path) {
+      <li
+        class="rounded-lg px-3 py-2"
+        [class]="issue.severity === 'warning' ? 'bg-warning/8' : 'bg-destructive/8'"
+      >
+        <span class="font-medium">{{ issue.code }}</span>: {{ issue.message }} @if (issue.path) {
+        <code class="text-muted-foreground font-mono text-xs">{{ issue.path }}</code>
+        }
+      </li>
+      }
+    </ul>
+    }
+
+    <div class="mt-4 overflow-x-auto rounded-xl ring-1 ring-black/5 dark:ring-white/8">
+      <table class="w-full min-w-[40rem] text-left text-sm">
+        <thead class="bg-muted/40 text-muted-foreground text-xs">
+          <tr>
+            <th scope="col" class="px-3 py-2 font-medium">Resource</th>
+            <th scope="col" class="px-3 py-2 font-medium">Format version</th>
+            <th scope="col" class="px-3 py-2 font-medium">Action</th>
+            <th scope="col" class="px-3 py-2 font-medium">Issues</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          @for (item of current.items; track item.kind + item.id) {
+          <tr class="align-top">
+            <td class="px-3 py-2.5">
+              <span class="font-medium">{{ item.kind }}</span
+              ><span class="text-muted-foreground">/</span
+              ><span class="font-mono text-[0.8125rem]">{{ item.id }}</span>
+            </td>
+            <td class="px-3 py-2.5 font-mono text-xs">
+              {{ item.sourceVersion }} → {{ item.targetVersion }} @if (item.migrations.length) {
+              <span class="text-muted-foreground mt-0.5 block font-sans"
+                >{{ item.migrations.join(', ') }}</span
+              >
+              }
+            </td>
+            <td class="px-3 py-2.5">
+              <span
+                class="rounded-full px-2 py-0.5 text-xs font-medium"
+                [class]="
+                  item.action === 'create'
+                    ? 'bg-success/12 text-success'
+                    : item.action === 'delete' || item.action === 'blocked'
+                      ? 'bg-destructive/10 text-destructive'
+                      : item.action === 'update'
+                        ? 'bg-primary/8 text-primary dark:bg-primary/15'
+                        : 'bg-muted text-muted-foreground'
+                "
+                >{{ item.action }}</span
+              >
+              @if (item.changes?.length) {
+              <span class="text-muted-foreground mt-1 block text-xs"
+                >{{ changeSummary(item) }}</span
+              >
+              }
+            </td>
+            <td class="px-3 py-2.5">
+              @for (issue of item.issues; track issue.code + issue.path) {
+              <p class="text-xs" [class.text-destructive]="issue.severity !== 'warning'">
+                <span class="font-medium">{{ issue.code }}</span>: {{ issue.message }}
+                <code class="text-muted-foreground font-mono">{{ issue.path }}</code>
+              </p>
+              } @empty {
+              <span class="text-muted-foreground">None</span>
+              }
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (reattachTarget() && regeneratesSecret() && !current.operationId) {
+    <p class="border-warning/30 bg-warning/8 mt-4 rounded-xl border px-4 py-3 text-sm">
+      <span class="font-semibold">New secret.</span> {{ reattachTarget()?.resourceId }} gets a new
+      secret, and its current secret stops working. With <code>"secret": "!generate"</code> in the
+      file the secret is generated and shown once; otherwise it is the secret from the file.
+    </p>
+    } @for (item of current.items; track item.kind + item.id) { @if (item.changes?.length) {
+    <h3 class="mt-6 mb-2 text-sm font-semibold">
+      Changes to {{ item.kind }}/<span class="font-mono">{{ item.id }}</span>
+    </h3>
+    <div class="overflow-x-auto rounded-xl ring-1 ring-black/5 dark:ring-white/8">
+      <table class="w-full min-w-[36rem] table-fixed text-left text-xs">
+        <thead class="bg-muted/40 text-muted-foreground">
+          <tr>
+            <th scope="col" class="w-1/3 px-3 py-2 font-medium">Field</th>
+            <!-- An applied plan keeps its changes; the stored value is then the new one. -->
+            <th scope="col" class="px-3 py-2 font-medium">{{ applied() ? 'Before' : 'Now' }}</th>
+            <th scope="col" class="px-3 py-2 font-medium">
+              {{ reattachTarget() ? (reapplies() ? 'After apply' : 'After reset') : 'After import'
+              }}
+            </th>
+          </tr>
+        </thead>
+        <tbody class="divide-y">
+          @for (change of item.changes; track change.path) { @let before = changeSide(change,
+          'before'); @let after = changeSide(change, 'after');
+          <tr class="align-top">
+            <th scope="row" class="px-3 py-2 font-mono font-medium break-all">{{ change.path }}</th>
+            <td class="px-3 py-2 break-all">
+              @if (before.kind === 'described') {
+              <em class="text-muted-foreground">{{ before.text }}</em>
+              } @else {
+              <code class="font-mono">{{ before.text }}</code>
+              }
+            </td>
+            <td class="px-3 py-2 break-all">
+              @if (after.kind === 'removed') {
+              <em class="text-destructive font-medium">removed</em>
+              } @else if (after.kind === 'described') {
+              <em class="text-muted-foreground">{{ after.text }}</em>
+              } @else {
+              <code class="font-mono">{{ after.text }}</code>
+              }
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    } } @if (hasRedactedChanges(current)) {
+    <p class="text-muted-foreground mt-3 text-xs">
+      Secret values are not shown, nor values that change between an object, a list and a plain
+      value.
+    </p>
+    } @if (current.assets?.length) {
+    <h3 class="mt-6 mb-2 text-sm font-semibold">Assets</h3>
+    <ul class="grid gap-1 text-sm">
+      @for (asset of current.assets; track asset.path) {
+      <li>
+        <code class="font-mono text-xs">{{ asset.path }}</code>
+        <span class="text-muted-foreground">: {{ asset.action }}</span>
+      </li>
+      }
+    </ul>
+    }
+  </section>
+  } @if (secrets().length) {
+  <section
+    class="border-warning/40 bg-card rounded-2xl border p-5 sm:p-6"
+    aria-labelledby="secrets-heading"
+    role="region"
+  >
+    <div class="flex items-start gap-3">
+      <span
+        class="bg-warning/12 text-warning grid size-10 shrink-0 place-items-center rounded-xl"
+        aria-hidden="true"
+      >
+        <ng-icon name="lucideKeyRound" />
+      </span>
+      <div>
+        <h2 id="secrets-heading" class="font-semibold">Generated client secrets</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          They are shown only here. Save them before you leave this page.
+        </p>
+      </div>
+    </div>
+    <ul class="mt-4 grid gap-2">
+      @for (secret of secrets(); track secret.id) {
+      <li class="bg-muted/60 flex items-center justify-between gap-3 rounded-xl px-4 py-3">
+        <span class="min-w-0">
+          <span class="block text-sm font-medium">{{ secret.id }}</span>
+          <span class="block font-mono text-sm break-all">{{ secret.value }}</span>
+        </span>
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          type="button"
+          [attr.aria-label]="'Copy the secret of ' + secret.id"
+          hlmTooltip="Copy secret"
+          (click)="copySecret(secret)"
+        >
+          <ng-icon name="lucideCopy" />
+        </button>
+      </li>
+      }
+    </ul>
+    <div class="mt-4 flex flex-wrap justify-end gap-2">
+      <button hlmBtn variant="outline" type="button" (click)="downloadSecrets()">
+        <ng-icon name="lucideDownload" aria-hidden="true" />
+        Download secrets
+      </button>
+      <button hlmBtn type="button" (click)="dismissSecrets()">I saved them</button>
+    </div>
+  </section>
+  }
+
+  <section
+    class="bg-card overflow-hidden rounded-2xl shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+    aria-labelledby="resources-heading"
+  >
+    <div class="px-5 pt-5 sm:px-6 sm:pt-6">
+      <h2 id="resources-heading" class="font-semibold">Resource ownership</h2>
+      <p class="text-muted-foreground mt-1 text-sm">
+        File-managed resources are read-only until you detach them. Startup imports skip detached
+        resources until you reset them to their file.
+      </p>
+    </div>
+
+    @if (resources.isPending()) {
+    <div class="grid gap-3 p-5" role="status" aria-label="Loading the resources">
+      @for (row of [1, 2, 3]; track row) {
+      <hlm-skeleton class="h-12 w-full rounded-xl" />
+      }
+    </div>
+    } @else if (resources.isError()) {
+    <div class="grid justify-items-center gap-3 px-6 py-12 text-center" role="alert">
+      <p class="font-semibold">The resources could not be loaded</p>
+      <p class="text-muted-foreground max-w-md text-sm">
+        {{ errorMessage(resources.error(), 'Failed to load the resource ownership') }}
+      </p>
+      <button hlmBtn variant="outline" type="button" (click)="resources.refetch()">Retry</button>
+    </div>
+    } @else if (!resources.data()?.length) {
+    <p class="text-muted-foreground px-5 py-8 text-sm sm:px-6">
+      No resource of this tenant has been recorded yet.
+    </p>
+    } @else {
+    <div class="mt-4 flex flex-wrap items-center gap-3 border-y px-4 py-3.5 sm:px-5">
+      <hlm-input-group class="h-9 w-full rounded-lg sm:max-w-72">
+        <hlm-input-group-addon>
+          <ng-icon name="lucideSearch" aria-hidden="true" />
+        </hlm-input-group-addon>
+        <input
+          hlmInputGroupInput
+          type="search"
+          aria-label="Search resources"
+          placeholder="Search by resource or source"
+          [value]="search()"
+          (input)="onSearch($event)"
+        />
+      </hlm-input-group>
+      <label class="sr-only" for="resource-kind">Kind</label>
+      <hlm-native-select
+        class="w-full sm:w-56"
+        selectClass="h-9"
+        selectId="resource-kind"
+        [value]="kindFilter()"
+        (valueChange)="kindFilter.set($any($event))"
+      >
+        <option value="" [selected]="!kindFilter()">All kinds</option>
+        @for (option of kindOptions(); track option.value) {
+        <option [value]="option.value" [selected]="kindFilter() === option.value">
+          {{ option.value }} ({{ option.count }})
+        </option>
+        }
+      </hlm-native-select>
+      <label class="sr-only" for="resource-ownership">Ownership</label>
+      <hlm-native-select
+        class="w-full sm:w-52"
+        selectClass="h-9"
+        selectId="resource-ownership"
+        [value]="ownershipFilter()"
+        (valueChange)="ownershipFilter.set($any($event))"
+      >
+        <option value="" [selected]="!ownershipFilter()">All owners</option>
+        @for (option of ownershipOptions(); track option.value) {
+        <option [value]="option.value" [selected]="ownershipFilter() === option.value">
+          {{ option.label }} ({{ option.count }})
+        </option>
+        }
+      </hlm-native-select>
+      @if (filtered()) {
+      <button hlmBtn variant="ghost" size="sm" type="button" (click)="clearFilters()">
+        <ng-icon name="lucideX" aria-hidden="true" />
+        Clear filters
+      </button>
+      }
+      <p class="text-muted-foreground text-sm sm:ms-auto" role="status">
+        @if (filtered()) { {{ shown().length }} of {{ resources.data()?.length }} } @else { {{
+        resources.data()?.length }} } resources
+      </p>
+    </div>
+
+    @if (selectedShown().length) {
+    <div class="bg-primary/5 flex flex-wrap items-center gap-3 border-b px-4 py-2.5 sm:px-5">
+      <span class="text-sm font-medium">{{ selectedShown().length }} selected</span>
+      <button
+        hlmBtn
+        variant="outline"
+        size="sm"
+        type="button"
+        [attr.aria-disabled]="!!busy() || null"
+        [attr.aria-busy]="busy() === 'detach' || null"
+        (click)="detachSelected()"
+      >
+        @if (busy() === 'detach') {
+        <hlm-spinner class="size-4" />
+        } @else {
+        <ng-icon name="lucideUnlink" aria-hidden="true" />
+        } Detach selected
+      </button>
+    </div>
+    } @if (!shown().length) {
+    <div class="grid justify-items-center gap-3 px-6 py-12 text-center">
+      <p class="font-semibold">No resource matches the filters</p>
+      <button hlmBtn variant="outline" type="button" (click)="clearFilters()">
+        <ng-icon name="lucideX" aria-hidden="true" />
+        Clear filters
+      </button>
+    </div>
+    } @else {
+    <div hlmTableContainer>
+      <table hlmTable>
+        <thead hlmTHead class="bg-muted/40">
+          <tr hlmTr class="hover:bg-transparent">
+            <th hlmTh scope="col" class="w-12 ps-4 sm:ps-5">
+              <hlm-checkbox
+                aria-label="Select every file-managed resource in view"
+                [checked]="allSelected()"
+                [disabled]="!detachable().length || !!busy()"
+                (checkedChange)="toggleAll($event === true)"
+              />
+            </th>
+            <th hlmTh scope="col" class="text-muted-foreground px-3">Resource</th>
+            <th hlmTh scope="col" class="text-muted-foreground px-3">Ownership</th>
+            <th hlmTh scope="col" class="text-muted-foreground hidden px-3 lg:table-cell">
+              Generation
+            </th>
+            <th hlmTh scope="col" class="text-muted-foreground hidden px-3 md:table-cell">
+              Source
+            </th>
+            <th hlmTh scope="col" class="hidden pe-4 sm:table-cell sm:pe-5">
+              <span class="sr-only">Actions</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody hlmTBody>
+          @for (resource of shown(); track resourceKey(resource)) { @let key =
+          resourceKey(resource); @let link = resourceLink(resource);
+          <tr hlmTr class="hover:bg-muted/40">
+            <td hlmTd class="py-2.5 ps-4 sm:ps-5">
+              @if (resource.ownership === 'file-managed') {
+              <hlm-checkbox
+                [aria-label]="'Select ' + key"
+                [checked]="selected().has(key)"
+                [disabled]="!!busy()"
+                (checkedChange)="toggle(resource, $event === true)"
+              />
+              }
+            </td>
+            <td hlmTd class="px-3 py-2.5">
+              @if (link) {
+              <a [routerLink]="link" class="hover:underline">
+                <span class="font-medium">{{ resource.kind }}</span
+                ><span class="text-muted-foreground">/</span
+                ><span class="font-mono text-[0.8125rem]">{{ resource.resourceId }}</span>
+              </a>
+              } @else {
+              <span class="font-medium">{{ resource.kind }}</span
+              ><span class="text-muted-foreground">/</span
+              ><span class="font-mono text-[0.8125rem]">{{ resource.resourceId }}</span>
+              }
+              <div class="mt-1.5 sm:hidden">
+                <ng-container
+                  *ngTemplateOutlet="actionsOf; context: { $implicit: resource, align: '-ms-3' }"
+                />
+              </div>
+            </td>
+            <td hlmTd class="px-3 py-2.5">
+              <span
+                class="rounded-full px-2 py-0.5 text-xs font-medium"
+                [class]="
+                  resource.ownership === 'file-managed'
+                    ? 'bg-primary/8 text-primary dark:bg-primary/15'
+                    : resource.ownership === 'detached'
+                      ? 'bg-warning/12 text-warning'
+                      : 'bg-muted text-muted-foreground'
+                "
+                >{{ ownershipLabels[resource.ownership] }}</span
+              >
+            </td>
+            <td hlmTd class="text-muted-foreground hidden px-3 py-2.5 tabular-nums lg:table-cell">
+              {{ resource.generation }}
+            </td>
+            <td hlmTd class="hidden max-w-72 px-3 py-2.5 md:table-cell">
+              <span
+                class="block truncate font-mono text-xs"
+                [class.text-muted-foreground]="!resource.source"
+                [title]="sourceLabel(resource)"
+                >{{ sourceLabel(resource) }}</span
+              >
+            </td>
+            <td hlmTd class="hidden py-2.5 pe-4 sm:table-cell sm:pe-5">
+              <ng-container
+                *ngTemplateOutlet="actionsOf; context: { $implicit: resource, align: 'justify-end' }"
+              />
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+    } }
+  </section>
+
+  <section
+    class="bg-card rounded-2xl p-5 shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 sm:p-6 dark:ring-white/8"
+    aria-labelledby="operations-heading"
+  >
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h2 id="operations-heading" class="font-semibold">Recent operations</h2>
+        <p class="text-muted-foreground mt-1 text-sm">
+          The imports and resets of this tenant, with every step.
+        </p>
+      </div>
+      <button
+        hlmBtn
+        variant="outline"
+        size="sm"
+        type="button"
+        [attr.aria-busy]="operations.isFetching() || null"
+        (click)="operations.refetch()"
+      >
+        @if (operations.isFetching() && !operations.isPending()) {
+        <hlm-spinner class="size-4" />
+        } @else {
+        <ng-icon name="lucideRefreshCw" aria-hidden="true" />
+        } Refresh
+      </button>
+    </div>
+    @if (operations.isPending()) {
+    <hlm-skeleton class="mt-4 h-12 w-full rounded-lg" />
+    } @else if (operations.isError()) {
+    <p class="text-muted-foreground mt-3 text-sm" role="alert">
+      {{ errorMessage(operations.error(), 'Failed to load the operations') }}
+      <button
+        hlmBtn
+        variant="link"
+        size="sm"
+        type="button"
+        class="h-auto p-0"
+        (click)="operations.refetch()"
+      >
+        Retry
+      </button>
+    </p>
+    } @else {
+    <ul class="mt-4 grid gap-2">
+      @for (operation of operations.data(); track operation.id) {
+      <li>
+        <details class="group rounded-xl border px-4 py-2.5">
+          <summary class="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+            <span>{{ dateTime(operation.createdAt) }}</span>
+            <span class="text-muted-foreground">{{ operation.mode }}</span>
+            <span
+              class="rounded-full px-2 py-0.5 text-xs font-medium"
+              [class]="
+                operation.status === 'completed'
+                  ? 'bg-success/12 text-success'
+                  : operation.status === 'running'
+                    ? 'bg-primary/8 text-primary dark:bg-primary/15'
+                    : 'bg-destructive/10 text-destructive'
+              "
+              >{{ operation.status }}</span
+            >
+          </summary>
+          <div class="text-muted-foreground mt-2 grid gap-1 text-xs">
+            <p>Operation <code class="text-foreground font-mono">{{ operation.id }}</code></p>
+            @for (step of operationSteps(operation); track $index) {
+            <p class="font-mono">{{ step }}</p>
+            } @if (operation.status === 'running') {
+            <p class="text-foreground text-sm">
+              It may still be running. If its worker crashed, stop that worker before you
+              acknowledge the interruption with the CLI.
+            </p>
+            }
+          </div>
+        </details>
+      </li>
+      } @empty {
+      <li class="text-muted-foreground text-sm">No configuration operation yet.</li>
+      }
+    </ul>
+    }
+  </section>
+</div>
+
+<ng-template #actionsOf let-resource let-align="align">
+  @let key = resourceKey(resource);
+  <div class="flex flex-wrap gap-1" [class]="align">
+    @if (resource.ownership === 'file-managed') { @if (canApplyFromFile(resource)) {
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      type="button"
+      [attr.aria-disabled]="!!busy() || null"
+      [attr.aria-label]="'Apply ' + key + ' from its file'"
+      hlmTooltip='Apply the version from the config folder again. A client with "secret": "!generate" gets a new secret, shown once.'
+      (click)="planReset(resource)"
+    >
+      Apply from file
+    </button>
+    }
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      type="button"
+      [attr.aria-disabled]="!!busy() || null"
+      [attr.aria-label]="'Detach ' + key"
+      (click)="detachOne(resource)"
+    >
+      <ng-icon name="lucideUnlink" aria-hidden="true" />
+      Detach
+    </button>
+    } @else if (canResetToFile(resource)) {
+    <button
+      hlmBtn
+      variant="ghost"
+      size="sm"
+      type="button"
+      [attr.aria-disabled]="!!busy() || null"
+      [attr.aria-label]="'Reset ' + key + ' to its file'"
+      hlmTooltip="Discard the changes made through the API or the Web Client and apply the version from the config folder"
+      (click)="planReset(resource)"
+    >
+      <ng-icon name="lucideRotateCcw" aria-hidden="true" />
+      Reset to file
+    </button>
+    }
+  </div>
+</ng-template>

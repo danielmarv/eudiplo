@@ -1,0 +1,276 @@
+<app-page-header
+  heading="API clients"
+  description="The services that sign in to this tenant with a client ID and secret, and the roles each one has."
+>
+  @if (!unavailable()) {
+  <a hlmBtn routerLink="create">
+    <ng-icon name="lucidePlus" aria-hidden="true" />
+    Add client
+  </a>
+  }
+</app-page-header>
+
+@if (unavailable()) {
+<section
+  class="bg-card grid justify-items-center gap-3 rounded-2xl px-6 py-16 text-center ring-1 ring-black/5 dark:ring-white/8"
+>
+  <span
+    class="bg-muted text-muted-foreground grid size-12 place-items-center rounded-2xl"
+    aria-hidden="true"
+  >
+    <ng-icon name="lucideBot" class="text-xl" />
+  </span>
+  <h2 class="font-semibold">Client management is unavailable</h2>
+  <p class="text-muted-foreground max-w-md text-sm">{{ unavailable() }}</p>
+</section>
+} @else {
+<section
+  class="bg-card overflow-hidden rounded-2xl shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+  aria-label="API clients"
+>
+  <div class="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3.5 sm:px-5">
+    <hlm-input-group class="h-9 w-full rounded-lg sm:max-w-80">
+      <hlm-input-group-addon>
+        <ng-icon name="lucideSearch" aria-hidden="true" />
+      </hlm-input-group-addon>
+      <input
+        hlmInputGroupInput
+        type="search"
+        aria-label="Search clients"
+        placeholder="Search by ID, description or role"
+        [value]="search()"
+        (input)="onSearch($event)"
+      />
+    </hlm-input-group>
+    @if (clients.isSuccess() && list().length) {
+    <p class="text-muted-foreground text-sm">
+      <span class="text-foreground font-medium tabular-nums">{{ list().length }}</span>
+      {{ list().length === 1 ? 'client' : 'clients' }}
+    </p>
+    }
+  </div>
+
+  @if (clients.isPending()) {
+  <div class="grid gap-3 p-5" aria-label="Loading the clients" role="status">
+    @for (row of [1, 2, 3]; track row) {
+    <hlm-skeleton class="h-14 w-full rounded-xl" />
+    }
+  </div>
+  } @else if (clients.isError()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center" role="alert">
+    <span
+      class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideTriangleAlert" class="text-xl" />
+    </span>
+    <p class="font-semibold">The clients could not be loaded</p>
+    <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(clients.error()) }}</p>
+    <button hlmBtn variant="outline" type="button" (click)="clients.refetch()">Retry</button>
+  </div>
+  } @else if (!list().length) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <span
+      class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideBot" class="text-xl" />
+    </span>
+    <p class="font-semibold">No API clients yet</p>
+    <p class="text-muted-foreground max-w-sm text-sm">
+      Add a client for each service that calls EUDIPLO, with only the roles it needs.
+    </p>
+    <a hlmBtn routerLink="create">
+      <ng-icon name="lucidePlus" aria-hidden="true" />
+      Add client
+    </a>
+  </div>
+  } @else if (!matching()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <p class="font-semibold">No client matches “{{ search() }}”</p>
+    <button hlmBtn variant="outline" type="button" (click)="clearSearch()">
+      <ng-icon name="lucideX" aria-hidden="true" />
+      Clear search
+    </button>
+  </div>
+  } @else {
+  <div hlmTableContainer>
+    <table hlmTable class="table-fixed">
+      <thead hlmTHead class="bg-muted/40">
+        <tr hlmTr class="hover:bg-transparent">
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground ps-4 pe-2 sm:ps-5 md:w-[38%]"
+            [attr.aria-sort]="ariaSort(column('client'))"
+          >
+            <app-sort-toggle [column]="column('client')">Client</app-sort-toggle>
+          </th>
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground hidden px-3 md:table-cell"
+            [attr.aria-sort]="ariaSort(column('roles'))"
+          >
+            <app-sort-toggle [column]="column('roles')">Roles</app-sort-toggle>
+          </th>
+          <th hlmTh scope="col" class="w-36 pe-3 sm:w-44 sm:pe-5">
+            <span class="sr-only">Actions</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody hlmTBody>
+        @for (row of table.getRowModel().rows; track row.id) { @let client = row.original; @let lock
+        = lockOf(client); @let roles = sortedRoles(client); @let busy = actions.busy() ===
+        client.clientId;
+        <tr hlmTr class="hover:bg-muted/40">
+          <td hlmTd class="py-3 ps-4 pe-2 sm:ps-5">
+            <div class="flex min-w-0 items-center gap-3">
+              <span
+                class="bg-accent text-accent-foreground grid size-9 shrink-0 place-items-center rounded-xl"
+                aria-hidden="true"
+              >
+                <ng-icon name="lucideBot" />
+              </span>
+              <span class="min-w-0">
+                <span class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <a
+                    [routerLink]="client.clientId"
+                    class="max-w-full truncate font-mono text-[0.8125rem] font-semibold hover:underline"
+                    >{{ client.clientId }}</a
+                  >
+                  @if (actions.isOwn(client.clientId)) {
+                  <span
+                    class="bg-primary/8 text-primary dark:bg-primary/15 shrink-0 rounded-full px-2 py-0.5 text-xs font-medium"
+                    >You</span
+                  >
+                  }
+                </span>
+                <span class="text-muted-foreground block truncate text-xs"
+                  >{{ client.description || 'No description' }}</span
+                >
+              </span>
+            </div>
+          </td>
+          <td hlmTd class="hidden px-3 py-3 whitespace-normal md:table-cell">
+            <ul class="flex flex-wrap gap-1.5" [attr.aria-label]="'Roles of ' + client.clientId">
+              @for (role of roles.slice(0, shownRoles); track role) {
+              <li class="bg-muted rounded-md px-1.5 py-0.5 font-mono text-xs">{{ role }}</li>
+              } @if (roles.length > shownRoles) {
+              <li class="text-muted-foreground px-1 py-0.5 text-xs" [title]="roles.join(', ')">
+                and {{ roles.length - shownRoles }} more
+              </li>
+              }
+            </ul>
+          </td>
+          <td hlmTd class="py-3 pe-3 sm:pe-5">
+            <div class="flex justify-end gap-0.5">
+              @if (lock) {
+              <span [id]="'lock-' + client.clientId" class="sr-only">{{ lock }}</span>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                class="text-muted-foreground cursor-not-allowed opacity-50"
+                aria-disabled="true"
+                [attr.aria-describedby]="'lock-' + client.clientId"
+                [attr.aria-label]="'Replace the secret of ' + client.clientId"
+                [hlmTooltip]="lock"
+              >
+                <ng-icon name="lucideKeyRound" />
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                class="text-muted-foreground cursor-not-allowed opacity-50"
+                aria-disabled="true"
+                [attr.aria-describedby]="'lock-' + client.clientId"
+                [attr.aria-label]="'Edit ' + client.clientId"
+                [hlmTooltip]="lock"
+              >
+                <ng-icon name="lucidePencil" />
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                class="text-muted-foreground cursor-not-allowed opacity-50"
+                aria-disabled="true"
+                [attr.aria-describedby]="'lock-' + client.clientId"
+                [attr.aria-label]="'Delete ' + client.clientId"
+                [hlmTooltip]="lock"
+              >
+                <ng-icon name="lucideTrash2" />
+              </button>
+              } @else {
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                class="text-muted-foreground"
+                [attr.aria-label]="'Replace the secret of ' + client.clientId"
+                [attr.aria-disabled]="busy || null"
+                [attr.aria-busy]="busy || null"
+                hlmTooltip="Replace secret"
+                (click)="actions.rotateSecret(client)"
+              >
+                @if (busy) {
+                <hlm-spinner class="size-4" />
+                } @else {
+                <ng-icon name="lucideKeyRound" />
+                }
+              </button>
+              <a
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                class="text-muted-foreground"
+                [routerLink]="[client.clientId, 'edit']"
+                [attr.aria-label]="'Edit ' + client.clientId"
+                hlmTooltip="Edit"
+              >
+                <ng-icon name="lucidePencil" />
+              </a>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                type="button"
+                class="text-muted-foreground hover:text-destructive"
+                [attr.aria-label]="'Delete ' + client.clientId"
+                [attr.aria-disabled]="busy || null"
+                hlmTooltip="Delete"
+                (click)="actions.delete(client)"
+              >
+                <ng-icon name="lucideTrash2" />
+              </button>
+              }
+              <a
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                class="text-muted-foreground"
+                [routerLink]="client.clientId"
+                [attr.aria-label]="'Open ' + client.clientId"
+                hlmTooltip="Open"
+              >
+                <ng-icon name="lucideChevronRight" />
+              </a>
+            </div>
+          </td>
+        </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <app-table-pagination [table]="table" singular="client" plural="clients" />
+  }
+</section>
+}
+
+<app-client-secret-dialog [credentials]="actions.secret()" (closed)="actions.secret.set(null)" />

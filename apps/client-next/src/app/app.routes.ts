@@ -176,9 +176,23 @@ export const routes: Routes = [
         loadChildren: () =>
           import('./features/tenants/tenants.routes').then((m) => m.TENANT_ROUTES),
       },
-      pending('clients', 'API clients', ['clients:manage']),
+      {
+        path: 'clients',
+        title: 'API clients',
+        canActivate: [requireRole('clients:manage')],
+        loadChildren: () =>
+          import('./features/clients/clients.routes').then((m) => m.CLIENT_ROUTES),
+      },
       pending('users', 'Users', ['users:manage']),
-      pending('admin/activity-logs', 'Activity log', ['clients:manage', 'audit:read']),
+      {
+        path: 'admin/activity-logs',
+        title: 'Activity log',
+        canActivate: [requireRole('clients:manage', 'audit:read')],
+        loadChildren: () =>
+          import('./features/activity-logs/activity-logs.routes').then(
+            (m) => m.ACTIVITY_LOG_ROUTES
+          ),
+      },
 
       // Settings
       {
@@ -189,7 +203,15 @@ export const routes: Routes = [
             (m) => m.ConnectionSettings
           ),
       },
-      pending('settings/config-portability', 'Config portability', TENANT_ADMIN_ROLES),
+      {
+        path: 'settings/config-portability',
+        title: 'Config portability',
+        canActivate: [requireRole(...TENANT_ADMIN_ROLES)],
+        loadChildren: () =>
+          import('./features/config-portability/config-portability.routes').then(
+            (m) => m.CONFIG_PORTABILITY_ROUTES
+          ),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

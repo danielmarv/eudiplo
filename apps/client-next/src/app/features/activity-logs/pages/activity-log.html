@@ -1,0 +1,296 @@
+<app-page-header
+  heading="Activity log"
+  description="Who created, changed or deleted the configuration of this tenant, and when."
+>
+  <button
+    hlmBtn
+    variant="outline"
+    type="button"
+    [attr.aria-disabled]="log.isFetching() || null"
+    [attr.aria-busy]="log.isFetching() || null"
+    (click)="refresh()"
+  >
+    @if (log.isFetching() && !log.isPending()) {
+    <hlm-spinner class="size-4" />
+    } @else {
+    <ng-icon name="lucideRefreshCw" aria-hidden="true" />
+    } Refresh
+  </button>
+</app-page-header>
+
+<section
+  class="bg-card overflow-hidden rounded-2xl shadow-[0_1px_2px_rgba(16,24,64,0.04),0_16px_36px_-24px_rgba(27,33,96,0.35)] ring-1 ring-black/5 dark:ring-white/8"
+  aria-label="Activity log"
+>
+  <div class="flex flex-wrap items-center gap-3 border-b px-4 py-3.5 sm:px-5">
+    <hlm-input-group class="h-9 w-full rounded-lg sm:max-w-72">
+      <hlm-input-group-addon>
+        <ng-icon name="lucideSearch" aria-hidden="true" />
+      </hlm-input-group-addon>
+      <input
+        hlmInputGroupInput
+        type="search"
+        aria-label="Search the activity log"
+        placeholder="Search by action, actor or field"
+        [value]="search()"
+        (input)="onSearch($event)"
+      />
+    </hlm-input-group>
+    <label class="sr-only" for="activity-object">Kind of object</label>
+    <hlm-native-select
+      class="w-full sm:w-60"
+      selectClass="h-9"
+      selectId="activity-object"
+      [value]="objectType()"
+      (valueChange)="onObjectType($any($event))"
+    >
+      <option value="" [selected]="!objectType()">All kinds of object</option>
+      @for (type of objectTypes(); track type.value) {
+      <option [value]="type.value" [selected]="objectType() === type.value">
+        {{ type.label }}
+      </option>
+      }
+    </hlm-native-select>
+    @if (log.isSuccess() && entries().length) {
+    <p class="text-muted-foreground text-sm sm:ms-auto">
+      <span class="text-foreground font-medium tabular-nums">{{ entries().length }}</span>
+      {{ entries().length === 1 ? 'entry' : 'entries' }}
+    </p>
+    }
+  </div>
+
+  @if (log.isPending()) {
+  <div class="grid gap-3 p-5" aria-label="Loading the activity log" role="status">
+    @for (row of [1, 2, 3, 4]; track row) {
+    <hlm-skeleton class="h-12 w-full rounded-xl" />
+    }
+  </div>
+  } @else if (log.isError()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center" role="alert">
+    <span
+      class="bg-destructive/10 text-destructive grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideTriangleAlert" class="text-xl" />
+    </span>
+    <p class="font-semibold">The activity log could not be loaded</p>
+    <p class="text-muted-foreground max-w-md text-sm">{{ errorMessage(log.error()) }}</p>
+    <button hlmBtn variant="outline" type="button" (click)="refresh()">Retry</button>
+  </div>
+  } @else if (!entries().length) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <span
+      class="bg-accent text-accent-foreground grid size-12 place-items-center rounded-2xl"
+      aria-hidden="true"
+    >
+      <ng-icon name="lucideHistory" class="text-xl" />
+    </span>
+    <p class="font-semibold">No activity yet</p>
+    <p class="text-muted-foreground max-w-sm text-sm">
+      Creating, changing or deleting a configuration of this tenant adds an entry here.
+    </p>
+  </div>
+  } @else if (!matching()) {
+  <div class="grid justify-items-center gap-3 px-6 py-14 text-center">
+    <p class="font-semibold">No entry matches the filters</p>
+    <button hlmBtn variant="outline" type="button" (click)="clearFilters()">
+      <ng-icon name="lucideX" aria-hidden="true" />
+      Clear filters
+    </button>
+  </div>
+  } @else {
+  <div hlmTableContainer>
+    <table hlmTable class="lg:table-fixed">
+      <thead hlmTHead class="bg-muted/40">
+        <tr hlmTr class="hover:bg-transparent">
+          <th hlmTh scope="col" class="w-11 ps-2 sm:w-12 sm:ps-4">
+            <span class="sr-only">Details</span>
+          </th>
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground w-28 px-2 sm:w-44"
+            [attr.aria-sort]="ariaSort(column('time'))"
+          >
+            <app-sort-toggle [column]="column('time')">When</app-sort-toggle>
+          </th>
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground px-3"
+            [attr.aria-sort]="ariaSort(column('action'))"
+          >
+            <app-sort-toggle [column]="column('action')">Action</app-sort-toggle>
+          </th>
+          <th
+            hlmTh
+            scope="col"
+            class="text-muted-foreground hidden w-56 px-3 md:table-cell"
+            [attr.aria-sort]="ariaSort(column('actor'))"
+          >
+            <app-sort-toggle [column]="column('actor')">Actor</app-sort-toggle>
+          </th>
+          <th hlmTh scope="col" class="text-muted-foreground hidden w-[30%] px-3 lg:table-cell">
+            Changed fields
+          </th>
+          <th hlmTh scope="col" class="hidden w-14 pe-3 sm:table-cell sm:pe-5">
+            <span class="sr-only">Copy</span>
+          </th>
+        </tr>
+      </thead>
+      <tbody hlmTBody>
+        @for (row of table.getRowModel().rows; track row.id) { @let entry = row.original; @let open
+        = expanded() === entry.id; @let actor = actorOf(entry); @let tone =
+        actionTone(entry.actionType);
+        <tr hlmTr class="hover:bg-muted/40" [class.bg-muted/30]="open">
+          <td hlmTd class="py-2.5 ps-2 sm:ps-4">
+            <button
+              hlmBtn
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              class="text-muted-foreground"
+              [attr.aria-expanded]="open"
+              [attr.aria-controls]="'entry-' + entry.id"
+              [attr.aria-label]="(open ? 'Hide details of ' : 'Show details of ') + actionLabel(entry.actionType)"
+              (click)="toggle(entry.id)"
+            >
+              <ng-icon
+                name="lucideChevronDown"
+                class="transition-transform"
+                [class.rotate-180]="open"
+              />
+            </button>
+          </td>
+          <td hlmTd class="text-muted-foreground px-2 py-2.5">
+            <span [title]="dateTime(entry.timestamp)">{{ relativeTime(entry.timestamp) }}</span>
+          </td>
+          <td hlmTd class="px-3 py-2.5 whitespace-normal">
+            <span
+              class="inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium"
+              [class]="
+                tone === 'create'
+                  ? 'bg-success/12 text-success'
+                  : tone === 'remove'
+                    ? 'bg-destructive/10 text-destructive'
+                    : tone === 'change'
+                      ? 'bg-primary/8 text-primary dark:bg-primary/15'
+                      : 'bg-muted text-muted-foreground'
+              "
+              >{{ actionLabel(entry.actionType) }}</span
+            >
+            <span class="text-muted-foreground mt-1 block truncate text-xs md:hidden"
+              >{{ actor.name }} · {{ actor.kind }}</span
+            >
+          </td>
+          <td hlmTd class="hidden px-3 py-2.5 md:table-cell">
+            <span class="block truncate" [title]="actor.name">{{ actor.name }}</span>
+            <span class="text-muted-foreground block text-xs">{{ actor.kind }}</span>
+          </td>
+          <td hlmTd class="hidden px-3 py-2.5 lg:table-cell">
+            @if (entry.changedFields?.length) {
+            <span
+              class="text-muted-foreground block truncate font-mono text-xs"
+              [title]="entry.changedFields!.join(', ')"
+              >{{ entry.changedFields!.join(', ') }}</span
+            >
+            } @else {
+            <span class="text-muted-foreground">—</span>
+            }
+          </td>
+          <td hlmTd class="hidden py-2.5 pe-3 sm:table-cell sm:pe-5">
+            <button
+              hlmBtn
+              variant="ghost"
+              size="icon-sm"
+              type="button"
+              class="text-muted-foreground"
+              aria-label="Copy the entry as JSON"
+              hlmTooltip="Copy as JSON"
+              (click)="copy(entry)"
+            >
+              <ng-icon name="lucideCopy" />
+            </button>
+          </td>
+        </tr>
+        @if (open) {
+        <tr hlmTr class="bg-muted/30 hover:bg-muted/30" [id]="'entry-' + entry.id">
+          <td hlmTd colspan="6" class="px-4 pt-1 pb-4 whitespace-normal sm:px-5">
+            <dl class="text-muted-foreground mb-3 flex flex-wrap gap-x-6 gap-y-1 text-xs">
+              <div class="flex gap-1.5">
+                <dt>Time</dt>
+                <dd class="text-foreground">{{ dateTime(entry.timestamp) }}</dd>
+              </div>
+              <div class="flex gap-1.5">
+                <dt>Actor</dt>
+                <dd class="text-foreground">
+                  {{ actor.name }} ({{ actor.kind }})@if (entry.actorId && entry.actorId !==
+                  actor.name) {, <span class="font-mono">{{ entry.actorId }}</span>}
+                </dd>
+              </div>
+              @if (entry.requestId) {
+              <div class="flex gap-1.5">
+                <dt>Request</dt>
+                <dd class="text-foreground font-mono">{{ entry.requestId }}</dd>
+              </div>
+              }
+            </dl>
+            <button
+              hlmBtn
+              variant="outline"
+              size="sm"
+              type="button"
+              class="mb-3 sm:hidden"
+              (click)="copy(entry)"
+            >
+              <ng-icon name="lucideCopy" aria-hidden="true" />
+              Copy as JSON
+            </button>
+            @let changes = changesOf(entry); @if (changes.length) {
+            <div class="bg-card overflow-x-auto rounded-xl ring-1 ring-black/5 dark:ring-white/8">
+              <table class="w-full table-fixed text-left text-xs">
+                <thead class="text-muted-foreground border-b">
+                  <tr>
+                    <th scope="col" class="w-24 px-3 py-2 font-medium sm:w-40">Field</th>
+                    <th scope="col" class="px-3 py-2 font-medium">Before</th>
+                    <th scope="col" class="px-3 py-2 font-medium">After</th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  @for (change of changes; track change.field) {
+                  <tr class="align-top">
+                    <th scope="row" class="px-3 py-2 font-mono font-medium break-all">
+                      {{ change.field }}
+                    </th>
+                    <td class="px-3 py-2">
+                      <pre
+                        class="text-muted-foreground max-h-48 overflow-auto font-mono break-all whitespace-pre-wrap"
+                      >
+{{ change.before }}</pre>
+                    </td>
+                    <td class="px-3 py-2">
+                      <pre class="max-h-48 overflow-auto font-mono break-all whitespace-pre-wrap">
+{{ change.after }}</pre>
+                    </td>
+                  </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            } @else {
+            <p class="text-muted-foreground text-sm">The entry records no field values.</p>
+            }
+          </td>
+        </tr>
+        } }
+      </tbody>
+    </table>
+  </div>
+  <app-table-pagination [table]="table" singular="entry" plural="entries" />
+  }
+</section>
+@if (capped()) {
+<p class="text-muted-foreground mt-3 text-sm">
+  Shows the latest {{ entries().length }} entries, the most the backend returns at once.
+</p>
+}

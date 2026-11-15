@@ -94,4 +94,8 @@ Session management is rebuilt at `/session-management` and `/session-management/
 
 The integration pages are rebuilt: webhook endpoints at `/webhook-endpoints` (list, details with the configurations that use one, create, edit, delete, download), the registrar connection at `/registrar`, and schemas at `/schema` (the catalog list, a version's details with publishing a new version, deprecation, deletion and catalog metadata, and publishing a new schema from credential types and trust lists or root certificates).
 
+The administration pages for API clients and the activity log are rebuilt: `/clients` (list, details, add and edit with role choices limited to the roles the caller may grant, limits to presentation configurations and credential types, secret replacement and deletion, the new secret shown once) and `/admin/activity-logs` (the latest 500 entries, filtered by kind of object and searchable, each with its field values before and after).
+
+Config portability is rebuilt at `/settings/config-portability`: export as archive or editable JSON, import of an archive, a bundle or a single document after a read-only plan (with field changes, removals and deletions confirmed), resource ownership with detach, bulk detach, apply from file and reset to file, generated client secrets shown until dismissed, and the latest configuration operations.
+
 Not carried over yet: the reaction to refused requests and expiring tokens (`ApiRefusalService` is here, but not started), the version check, and the Playwright tests.
